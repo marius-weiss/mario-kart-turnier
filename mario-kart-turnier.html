@@ -185,6 +185,13 @@ body.display .htag{font-size:16px}
 .hcard .em{font-size:34px;line-height:1}
 .hcard b{display:block;font:italic 900 19px var(--display)}
 body.display .hcard{font-size:24px} body.display .hcard b{font-size:30px} body.display .hcard .em{font-size:52px}
+/* Kopfgeld & Stechen */
+.btag{display:inline-block;margin-left:8px;font-size:12px;font-weight:800;background:var(--gold);color:#1B1D29;border:2px solid var(--edge);border-radius:8px;padding:1px 7px;line-height:1.3;vertical-align:middle;white-space:nowrap}
+body.display .btag{font-size:16px}
+.bonus{font-size:.8em;font-weight:800;color:var(--green);margin-left:4px;white-space:nowrap}
+.bnote{background:color-mix(in srgb,var(--gold) 30%,var(--panel2));border:2px solid var(--edge);border-radius:12px;padding:8px 14px;font-weight:600;margin:0 0 14px}
+.tbbtn{font:700 12px var(--body);margin-left:8px;border:2px solid var(--edge);border-radius:8px;background:var(--panel);color:var(--ink);padding:2px 8px;cursor:pointer;vertical-align:middle}
+.tie.won{color:var(--green)}
 </style>
 </head>
 <body>
@@ -217,7 +224,7 @@ body.display .hcard{font-size:24px} body.display .hcard b{font-size:30px} body.d
 
 <script>
 const KEY='mk-turnier-v2';
-const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{}});
+const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:3,tb:{}});
 let S=load(), ligaView=0, isDisplay=false, dIndex=0, dTimer=null;
 function load(){try{const l=localStorage.getItem(KEY);if(l)return Object.assign(DEF(),JSON.parse(l));}catch(e){}return DEF();}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
@@ -254,14 +261,32 @@ const roundComplete=r=>r.groups.every(g=>g.members.every(id=>typeof g.scores[id]
 const roundTouched=r=>r.groups.some(g=>Object.keys(g.scores).length>0);
 const inAnyRound=id=>S.roundsData.some(r=>r.groups.some(g=>g.members.includes(id)));
 const ligaDone=()=>S.roundsData.length>=S.rounds&&S.roundsData.slice(0,S.rounds).every(roundComplete);
+/* Kopfgeld: Träger wird beim Auslosen in roundsData[i].bounty festgehalten, Bonus wird nur berechnet, nie gespeichert */
+const bountyPts=()=>Math.max(0,Math.round(+S.bountyPts||0));
+const bountyOf=r=>S.bountyOn!==false&&r&&r.bounty?r.bounty:null;
+function bountyBonus(r,id){
+  const b=bountyOf(r);if(!b||b===id)return 0;
+  const g=r.groups.find(g=>g.members.includes(b));if(!g||!g.members.includes(id))return 0;
+  const sb=g.scores[b],sp=g.scores[id];
+  return typeof sb==='number'&&typeof sp==='number'&&sp>sb?bountyPts():0;
+}
+/* Stechen: S.tb["Gesamt|Bestwert"] = IDs der Stechen-Sieger in Reihenfolge. Ändert sich die Punktzahl, greift der Eintrag nicht mehr. */
+const tieSig=r=>r.total+'|'+r.best;
+const tbRank=r=>{const l=S.tb&&S.tb[tieSig(r)],i=Array.isArray(l)?l.indexOf(r.id):-1;return i<0?Infinity:i;};
 function standings(){
   const rows=S.players.map(p=>{
     const per=S.roundsData.map(r=>{for(const g of r.groups)if(g.members.includes(p.id))return typeof g.scores[p.id]==='number'?g.scores[p.id]:null;return null;});
+    const bonus=S.roundsData.map(r=>bountyBonus(r,p.id));
     const v=per.filter(x=>x!==null);
-    return{id:p.id,name:p.name,per,total:v.reduce((a,b)=>a+b,0),best:v.length?Math.max(...v):0};
+    return{id:p.id,name:p.name,per,bonus,total:v.reduce((a,b)=>a+b,0)+bonus.reduce((a,b)=>a+b,0),best:v.length?Math.max(...v):0};
   });
-  rows.sort((a,b)=>b.total-a.total||b.best-a.best||a.name.localeCompare(b.name,'de'));
-  rows.forEach((r,i)=>{const o=rows[i-1],n=rows[i+1];r.tie=r.total>0&&((o&&o.total===r.total&&o.best===r.best)||(n&&n.total===r.total&&n.best===r.best));});
+  rows.forEach(r=>r.tbr=tbRank(r));
+  rows.sort((a,b)=>b.total-a.total||b.best-a.best||(a.tbr===b.tbr?0:a.tbr<b.tbr?-1:1)||a.name.localeCompare(b.name,'de'));
+  const same=(a,b)=>!!(a&&b&&a.total===b.total&&a.best===b.best);
+  rows.forEach((r,i)=>{const o=rows[i-1],n=rows[i+1];
+    r.tieAny=r.total>0&&(same(o,r)||same(n,r));
+    r.tie=r.tieAny&&r.tbr===Infinity&&rows.some(x=>x!==r&&same(x,r)&&x.tbr===Infinity);
+    r.tieWon=r.tieAny&&r.tbr!==Infinity;});
   return rows;
 }
 function planFor(n){
@@ -292,20 +317,28 @@ function startFinals(){
 }
 
 /* ---------- Bausteine ---------- */
-function tableHtml(){
+function tableHtml(editable){
   const st=standings(),plan=planFor(st.length);
   if(!st.length)return`<p class="muted">Noch keine Teilnehmer.</p>`;
   const nR=Math.max(S.rounds,S.roundsData.length);
+  const tieCell=r=>r.tie?`<span class="tie">Stechen</span>${editable?`<button class="tbbtn" data-tbwin="${r.id}" aria-label="${esc(r.name)} hat das Stechen gewonnen">hat gewonnen</button>`:''}`
+    :r.tieWon?`<span class="tie won">Stechen ✓</span>${editable?`<button class="tbbtn" data-tbreset="${esc(tieSig(r))}" aria-label="Stechen bei ${esc(r.name)} zurücksetzen" title="Stechen zurücksetzen">↺</button>`:''}`:'';
+  const cell=(r,k)=>r.per[k]==null?'–':r.per[k]+(r.bonus[k]?` <span class="bonus" title="Kopfgeld-Bonus">+${r.bonus[k]}</span>`:'');
   return`<div class="scroll"><table><thead><tr><th>Platz</th><th>Name</th>${Array.from({length:nR},(_,i)=>`<th class="num">R${i+1}</th>`).join('')}<th class="num">Gesamt</th></tr></thead>
-  <tbody>${st.map((r,i)=>`<tr class="${i<plan.qual&&plan.type!=='direct'?'qual':''}"><td>${badge(i+1)}</td><td>${esc(r.name)}${r.tie?'<span class="tie">Stechen</span>':''}</td>
-  ${Array.from({length:nR},(_,k)=>`<td class="num">${r.per[k]??'–'}</td>`).join('')}<td class="num total">${r.total}</td></tr>`).join('')}</tbody></table></div>`;
+  <tbody>${st.map((r,i)=>`<tr class="${i<plan.qual&&plan.type!=='direct'?'qual':''}"><td>${badge(i+1)}</td><td>${esc(r.name)}${tieCell(r)}</td>
+  ${Array.from({length:nR},(_,k)=>`<td class="num">${cell(r,k)}</td>`).join('')}<td class="num total">${r.total}</td></tr>`).join('')}</tbody></table></div>`;
 }
+function bountyNote(r){
+  const b=bountyOf(r);if(!b)return'';
+  return`<p class="bnote">💰 Kopfgeld auf <b>${esc(nameOf(b))}</b>: Wer in derselben Gruppe mehr Punkte holt, bekommt +${bountyPts()} Bonuspunkte.</p>`;
+}
+const MAX_SCORE=60;
 function groupsHtml(r,editable,gIdx){
   return`<div class="groups">${r.groups.map((g,gi)=>`<article class="group c${g.console}">
     <div class="gh"><h3>Gruppe ${gi+1}</h3><span>Konsole ${g.console} · Durchgang ${g.wave}</span></div>
-    <div class="gb">${g.members.map(id=>`<div class="prow"><span>${esc(nameOf(id))}${htag(gIdx+1,id)}</span>${editable
-      ?`<input type="number" min="0" max="300" inputmode="numeric" aria-label="Punkte ${esc(nameOf(id))}" data-key="sc-${gIdx}-${gi}-${id}" data-g="${gi}" data-p="${id}" value="${typeof g.scores[id]==='number'?g.scores[id]:''}">`
-      :`<b>${typeof g.scores[id]==='number'?g.scores[id]+' Pkt.':''}</b>`}</div>`).join('')}</div></article>`).join('')}</div>`;
+    <div class="gb">${g.members.map(id=>`<div class="prow"><span>${esc(nameOf(id))}${bountyOf(r)===id?'<span class="btag" title="Kopfgeld-Träger">💰 Kopfgeld</span>':''}${htag(gIdx+1,id)}</span>${editable
+      ?`<input type="number" min="0" max="${MAX_SCORE}" inputmode="numeric" aria-label="Punkte ${esc(nameOf(id))}" data-key="sc-${gIdx}-${gi}-${id}" data-g="${gi}" data-p="${id}" value="${typeof g.scores[id]==='number'?g.scores[id]:''}">`
+      :`<b>${typeof g.scores[id]==='number'?g.scores[id]+' Pkt.'+(bountyBonus(r,id)?` <span class="bonus">+${bountyBonus(r,id)}</span>`:''):''}</b>`}</div>`).join('')}</div></article>`).join('')}</div>`;
 }
 function heatNode(h,key,editable,cls,from,placeholder){
   let body;
@@ -391,6 +424,11 @@ function renderTeilnehmer(){
       <label>Liga-Runden <select id="rounds">${[2,3,4].map(r=>`<option ${S.rounds==r?'selected':''}>${r}</option>`).join('')}</select></label>
     </div>
     <div class="row" style="margin-top:14px">
+      <label><input type="checkbox" id="bountyOn" ${S.bountyOn!==false?'checked':''}> 💰 Kopfgeld auf den Tabellenführer (ab Runde 2)</label>
+      <label>Bonus <input type="number" id="bountyPts" min="1" max="15" value="${bountyPts()}" ${S.bountyOn!==false?'':'disabled'}> Pkt.</label>
+    </div>
+    <p class="note" style="margin-top:6px">Wer in derselben Gruppe mehr Punkte holt als der Kopfgeld-Träger, bekommt den Bonus für diese Runde.</p>
+    <div class="row" style="margin-top:14px">
       <label class="btn ghost" style="display:inline-block">${S.logo?'Bild ersetzen':'Eigenes Bild für den Kopf hochladen'}<input type="file" id="logoFile" accept="image/*" hidden></label>
       ${S.logo?'<button class="btn danger" id="logoDel">Bild entfernen</button>':''}
     </div>
@@ -409,6 +447,8 @@ function renderTeilnehmer(){
   $('teilnehmer').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.players=S.players.filter(p=>p.id!==b.dataset.del);persist();render();});
   $('consoles').onchange=e=>{S.consoles=+e.target.value;persist();render();};
   $('rounds').onchange=e=>{S.rounds=+e.target.value;persist();render();};
+  $('bountyOn').onchange=e=>{S.bountyOn=e.target.checked;persist();render();};
+  $('bountyPts').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=1&&v<=15)){alert('Bitte einen Bonus zwischen 1 und 15 Punkten eintragen.');e.target.value=bountyPts();return;}S.bountyPts=v;persist();render();};
   $('expBtn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='mario-kart-turnier-stand.json';a.click();};
   $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=Object.assign(DEF(),d);persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
   $('logoFile').onchange=e=>{const file=e.target.files[0];if(!file)return;const img=new Image();img.onload=()=>{const k=Math.min(1,360/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);S.logo=c.toDataURL('image/png');persist();render();URL.revokeObjectURL(img.src);};img.src=URL.createObjectURL(file);};
@@ -430,7 +470,7 @@ function renderLiga(){
   <div class="roundbar">${R.map((x,i)=>`<button class="pill ${roundComplete(x)?'done':''}" data-r="${i}" aria-pressed="${i===ligaView}">Runde ${i+1}</button>`).join('')}</div>
   <p class="muted">Pro Gruppe ein VS-Rennen mit 4 Zufallsstrecken. Danach die Gesamtpunkte eintragen, die das Spiel anzeigt.</p>
   ${S.pen&&S.pen[ligaView+1]?`<div class="panel"><h3>🎡 Handicaps in Runde ${ligaView+1}</h3>${hcardsHtml(ligaView+1)}</div>`:''}
-  ${groupsHtml(r,true,ligaView)}
+  ${bountyNote(r)}${groupsHtml(r,true,ligaView)}
   <div class="row" style="margin-top:18px">
     ${atLast&&R.length<S.rounds?`<button class="btn go" id="drawBtn" ${canDraw?'':'disabled'}>Runde ${R.length+1} auslosen</button>`:''}
     ${atLast&&!roundTouched(last)&&!S.finals?`<button class="btn ghost" id="redrawBtn">Runde ${R.length} neu auslosen</button>`:''}
@@ -439,8 +479,11 @@ function renderLiga(){
   </div>${wheelAreaHtml()}`;
   $('liga').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ligaView=+b.dataset.r;renderLiga();});
   $('liga').querySelectorAll('input[data-p]').forEach(inp=>inp.onchange=()=>{
-    const g=r.groups[+inp.dataset.g],v=inp.value.trim();
-    if(v==='')delete g.scores[inp.dataset.p];else g.scores[inp.dataset.p]=Math.max(0,Math.round(+v));
+    const g=r.groups[+inp.dataset.g],v=inp.value.trim(),old=g.scores[inp.dataset.p];
+    if(v===''){delete g.scores[inp.dataset.p];}
+    else{const x=Math.round(+v);
+      if(!Number.isFinite(x)||x<0||x>MAX_SCORE){alert(`Bitte 0 bis ${MAX_SCORE} Punkte eintragen (4 Rennen × höchstens 15 Punkte).`);inp.value=typeof old==='number'?old:'';inp.focus();return;}
+      g.scores[inp.dataset.p]=x;}
     persist();queueRender();
   });
   const d=$('drawBtn');if(d)d.onclick=draw;
@@ -449,11 +492,19 @@ function renderLiga(){
   const wp=$('wheelReplay');if(wp)wp.onclick=()=>{if(S.fx&&S.fx.type==='wheel'){S.fx={...S.fx,t:Date.now()};seenFx=S.fx.t;persist();playWheel(S.fx);}};
   const wdl=$('wheelDel');if(wdl)wdl.onclick=()=>{const wr=wheelRound();if(wr&&confirm('Handicaps für Runde '+wr+' verwerfen? Danach kann neu gedreht werden.')){delete S.pen[wr];persist();render();}};
 }
-function draw(){S.roundsData.push({groups:splitIntoGroups(S.players.map(p=>p.id),pairCounts())});ligaView=S.roundsData.length-1;S.fx={type:'draw',round:S.roundsData.length,t:Date.now()};seenFx=S.fx.t;persist();render();playStart(S.fx.round);}
+function draw(){
+  const rd={groups:splitIntoGroups(S.players.map(p=>p.id),pairCounts())};
+  if(S.bountyOn!==false&&S.roundsData.length>=1){const lead=standings()[0];if(lead&&rd.groups.some(g=>g.members.includes(lead.id)))rd.bounty=lead.id;}
+  S.roundsData.push(rd);ligaView=S.roundsData.length-1;S.fx={type:'draw',round:S.roundsData.length,t:Date.now()};seenFx=S.fx.t;persist();render();playStart(S.fx.round);}
 function renderTabelle(){
   const plan=planFor(S.players.length);
-  $('tabelle').innerHTML=`<h2>Tabelle</h2><div class="panel">${tableHtml()}
-  <p class="note">${plan.type!=='direct'?`Grün: Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen.</p></div>`;
+  $('tabelle').innerHTML=`<h2>Tabelle</h2><div class="panel">${tableHtml(true)}
+  <p class="note">${plan.type!=='direct'?`Grün: Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}${S.bountyOn!==false?`„+${bountyPts()}“ hinter Rundenpunkten ist der Kopfgeld-Bonus, er zählt in die Gesamtpunkte. `:''}Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
+  $('tabelle').querySelectorAll('[data-tbwin]').forEach(b=>b.onclick=()=>{
+    const r=standings().find(x=>x.id===b.dataset.tbwin);if(!r)return;
+    const k=tieSig(r);S.tb=S.tb&&typeof S.tb==='object'?S.tb:{};
+    const l=Array.isArray(S.tb[k])?S.tb[k]:[];if(!l.includes(r.id))l.push(r.id);S.tb[k]=l;persist();render();});
+  $('tabelle').querySelectorAll('[data-tbreset]').forEach(b=>b.onclick=()=>{if(S.tb)delete S.tb[b.dataset.tbreset];persist();render();});
 }
 function renderFinale(){
   const F=S.finals,n=S.players.length;
@@ -488,7 +539,7 @@ function renderDisplay(){
   const views=displayViews();if(dIndex>=views.length)dIndex=0;
   const cur=views[dIndex],R=S.roundsData,last=R[R.length-1];
   let title='',body='';
-  if(cur==='runde'){title=`Jetzt am Start: Runde ${R.length}`;body=groupsHtml(last,false,R.length-1);}
+  if(cur==='runde'){title=`Jetzt am Start: Runde ${R.length}`;body=bountyNote(last)+groupsHtml(last,false,R.length-1);}
   if(cur==='tabelle'){title='Tabelle';body=`<div class="panel">${tableHtml()}</div>`;}
   if(cur==='baum'){title='Turnierbaum';body=`<div class="panel">${treeHtml(false)}</div>`;}
   if(cur==='sieger'){title='Siegerehrung';body=podiumHtml();}
