@@ -1,0 +1,11 @@
+// Konfiguration für Cloudflare Workers (statische Seite, kein Worker-Code).
+// Wird beim Hosting auf einem anderen Server einfach ignoriert.
+{
+  "name": "mario-kart-turnier",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./"
+  },
+  // Pflicht für "wrangler preview" (Builds auf Nicht-Production-Branches)
+  "previews": {}
+}
