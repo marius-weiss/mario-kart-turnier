@@ -1,0 +1,7 @@
+# Nicht mit ausliefern
+.git
+.wrangler
+.gitignore
+.assetsignore
+wrangler.jsonc
+node_modules

@@ -1,2 +1,5 @@
 # exportierte Turnierstaende nicht committen
 mario-kart-turnier-stand*.json
+
+# lokaler Wrangler-Cache
+.wrangler/
