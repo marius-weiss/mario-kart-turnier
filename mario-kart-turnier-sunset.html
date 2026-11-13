@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mario Kart Turnier – Sonnenuntergang</title>
 <style>
@@ -203,6 +204,13 @@ body.display .btag{font-size:16px}
 .bnote{background:color-mix(in srgb,var(--gold) 30%,var(--panel2));border:2px solid var(--edge);border-radius:12px;padding:8px 14px;font-weight:600;margin:0 0 14px}
 .tbbtn{font:700 12px var(--body);margin-left:8px;border:2px solid var(--edge);border-radius:8px;background:var(--panel);color:var(--ink);padding:2px 8px;cursor:pointer;vertical-align:middle}
 .tie.won{color:var(--green)}
+/* Ruhmeshalle */
+.rgrid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start}
+@media (max-width:900px){.rgrid{grid-template-columns:minmax(0,1fr)}}
+.rpod{margin-top:4px;font-weight:600}
+.rwarn{background:color-mix(in srgb,var(--red) 14%,var(--panel2));border:2px solid var(--edge);border-radius:12px;padding:8px 14px;font-weight:600;margin:10px 0 0}
+input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3px solid var(--edge);border-radius:10px;padding:8px 12px}
+.tbbtn.del{color:var(--red)}
 </style>
 </head>
 <body>
@@ -216,6 +224,7 @@ body.display .btag{font-size:16px}
       <button role="tab" data-tab="liga">Liga</button>
       <button role="tab" data-tab="tabelle">Tabelle</button>
       <button role="tab" data-tab="finale">Turnierbaum</button>
+      <button role="tab" data-tab="ruhm">Ruhmeshalle</button>
       <span class="spacer"></span>
       <button class="show" id="openDisplay">Anzeige für Bildschirm öffnen</button>
     </nav>
@@ -225,6 +234,7 @@ body.display .btag{font-size:16px}
     <section id="liga" class="edit-only"></section>
     <section id="tabelle" class="edit-only"></section>
     <section id="finale" class="edit-only"></section>
+    <section id="ruhm" class="edit-only"></section>
     <section id="anzeige"></section>
   </main>
 </div>
@@ -234,13 +244,13 @@ body.display .btag{font-size:16px}
 <div class="flags" id="flags" aria-hidden="true"><div class="flag"></div><div class="flag"></div></div>
 
 <script>
-const KEY='mk-turnier-v2';
+const KEY='mk-turnier-v2',RKEY='mk-ruhm-v1';
 const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:3,tb:{}});
 let S=load(), ligaView=0, isDisplay=false, dIndex=0, dTimer=null;
 function load(){try{const l=localStorage.getItem(KEY);if(l)return Object.assign(DEF(),JSON.parse(l));}catch(e){}return DEF();}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 let seenFx=S.fx?S.fx.t:0;
-window.addEventListener('storage',e=>{if(e.key!==KEY)return;S=load();
+window.addEventListener('storage',e=>{if(e.key===RKEY){render();return;}if(e.key!==KEY)return;S=load();
   if(S.fx&&S.fx.t>seenFx&&Date.now()-S.fx.t<20000){seenFx=S.fx.t;
     if(S.fx.type==='draw'){playStart(S.fx.round);if(isDisplay){dIndex=0;startRotation();}}
     if(S.fx.type==='win'){playWin();if(isDisplay){dIndex=0;startRotation();}}
@@ -414,12 +424,13 @@ function renderTeilnehmer(){
   const n=S.players.length,plan=planFor(n),e=estimate(n),started=S.roundsData.length>0;
   $('teilnehmer').innerHTML=`
   <div class="panel"><h2>Wer fährt mit?</h2>
-    <div class="row"><input type="text" id="newName" data-key="newName" placeholder="Name eintragen, Enter drücken" aria-label="Name"><button class="btn go" id="addBtn">Hinzufügen</button></div>
+    <div class="row"><input type="text" id="newName" data-key="newName" placeholder="Name eintragen, Enter drücken" aria-label="Name" list="ruhmNames" autocomplete="off"><datalist id="ruhmNames">${knownNames().filter(k=>!S.players.some(p=>normName(p.name)===normName(k))).map(k=>`<option value="${esc(k)}">`).join('')}</datalist><button class="btn go" id="addBtn">Hinzufügen</button></div>
     <details><summary>Mehrere Namen auf einmal einfügen</summary>
       <p class="note">Ein Name pro Zeile oder mit Komma getrennt, z. B. aus den Outlook-Zusagen kopiert.</p>
       <textarea id="bulk" aria-label="Mehrere Namen"></textarea><div class="row" style="margin-top:8px"><button class="btn" id="bulkBtn">Alle hinzufügen</button></div></details>
     ${n?`<div class="chips">${S.players.map(p=>`<span class="chip">${esc(p.name)}<button data-del="${p.id}" aria-label="${esc(p.name)} entfernen" ${inAnyRound(p.id)?'disabled':''}>×</button></span>`).join('')}</div>`
       :`<p class="note">Noch niemand eingetragen. Der Ablauf unten passt sich automatisch an.</p>`}
+    ${knownNames().length?`<p class="note">Namen aus der Ruhmeshalle werden beim Tippen vorgeschlagen. Gleiche Schreibweise verwenden, dann zählen die Turniere in der Ewigen Tabelle zusammen.</p>`:''}
     ${started?`<p class="note">Die Liga läuft schon. Wer jetzt dazukommt, fährt ab der nächsten ausgelosten Runde mit.</p>`:''}
   </div>
   <div class="panel"><h2>So läuft’s bei ${n} ${n===1?'Person':'Personen'}</h2>
@@ -523,13 +534,15 @@ function renderFinale(){
   <p class="note">${F?(F.fun.length?'Reihenfolge: zuerst das Spaßfinale, dann schauen alle gemeinsam das Finale. ':'')+'Trag die Plätze ein, die das Spiel nach dem Rennen anzeigt.':esc(planFor(n).text)}</p>
   <div class="row" style="margin-top:14px">${F?`<button class="btn ghost" id="unfinBtn">Finalrunde zurücksetzen</button>`
     :`<button class="btn go" id="finBtn" ${ligaDone()&&n>=2?'':'disabled'}>Finalrunde starten</button>${ligaDone()?'':`<span class="muted">Geht los, sobald alle ${S.rounds} Liga-Runden eingetragen sind.</span>`}`}</div></div>
-  ${podiumHtml()}`;
+  ${podiumHtml()}${archiveHtml()}`;
   $('finale').querySelectorAll('select[data-heat]').forEach(sel=>{
     const k=sel.dataset.heat,h=k==='f'?finalHeat():F.semis[+k.slice(1)];
     sel.value=h.place[sel.dataset.p]||'';
     sel.onchange=()=>{const t=k==='f'?F.finalPlace:h.place;const before=heatComplete(finalHeat());if(sel.value)t[sel.dataset.p]=+sel.value;else delete t[sel.dataset.p];if(k!=='f')F.finalPlace={};const won=!before&&heatComplete(finalHeat());if(won){S.fx={type:'win',t:Date.now()};seenFx=S.fx.t;}persist();queueRender();if(won)playWin();};
   });
   const b=$('finBtn');if(b)b.onclick=startFinals;
+  const ab=$('arBtn');if(ab)ab.onclick=()=>archiveTournament(false);
+  const au=$('arUpd');if(au)au.onclick=()=>archiveTournament(true);
   const u=$('unfinBtn');if(u)u.onclick=()=>{if(confirm('Finalrunde zurücksetzen? Die Liga bleibt erhalten.')){S.finals=null;persist();render();}};
 }
 function podiumHtml(){
@@ -544,6 +557,7 @@ function displayViews(){
   const v=[],R=S.roundsData,last=R[R.length-1];
   if(S.finals){const fh=finalHeat();if(fh&&heatComplete(fh))v.push('sieger');v.push('baum','tabelle');}
   else{if(last&&!roundComplete(last))v.push('runde');if(handicapRound())v.push('handicap');v.push('tabelle','baum');}
+  if(ruhmAll().length)v.push('ruhm');
   return v;
 }
 function renderDisplay(){
@@ -554,6 +568,7 @@ function renderDisplay(){
   if(cur==='tabelle'){title='Tabelle';body=`<div class="panel">${tableHtml()}</div>`;}
   if(cur==='baum'){title='Turnierbaum';body=`<div class="panel">${treeHtml(false)}</div>`;}
   if(cur==='sieger'){title='Siegerehrung';body=podiumHtml();}
+  if(cur==='ruhm'){title='Ruhmeshalle';body=ruhmHtml(false);}
   if(cur==='handicap'){const hr=handicapRound();title=`Handicaps für Runde ${hr}`;body=`<div class="panel">${hcardsHtml(hr)}</div>`;}
   const counter=S.finals?(heatComplete(finalHeat()||{members:[]})?'Ziel!':'Finale'):(R.length?`Runde ${R.length}/${S.rounds}`:'');
   $('anzeige').innerHTML=`<div class="dhead"><div class="brand">${brandHtml()}</div>
@@ -600,7 +615,8 @@ function htag(round,id){
 }
 function hcardsHtml(round){
   const list=S.pen&&S.pen[round];if(!list||!list.length)return'';
-  return`<div class="hlist">${list.map(h=>{const c=splitCard(h.card);return`<div class="hcard"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><b>${esc(nameOf(h.id))}</b>${esc(c.text)}</div></div>`;}).join('')}</div>`;
+  const bt=bountyOf(S.roundsData[round-1]);
+  return`<div class="hlist">${list.map(h=>{const c=splitCard(h.card);return`<div class="hcard"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><b>${esc(nameOf(h.id))}${bt===h.id?'<span class="btag" title="Trägt in dieser Runde auch das Kopfgeld">💰 Kopfgeld</span>':''}</b>${esc(c.text)}</div></div>`;}).join('')}</div>`;
 }
 function wheelAreaHtml(){
   const wr=wheelRound();if(!wr)return'';
@@ -702,8 +718,113 @@ function spinWheel(){
   persist();render();unlockAudio();playWheel(S.fx);
 }
 
+/* ---------- Ruhmeshalle ----------
+   Online-Stand: ruhmeshalle.json (relativer Pfad, statisch ausgeliefert).
+   Neue Einträge landen zuerst in localStorage (RKEY) und werden per Download in die Datei übernommen.
+   Der Download ist nur möglich, wenn die Online-Datei gültig geladen wurde, damit nichts verloren geht. */
+const RUHM_URL='ruhmeshalle.json';
+let ruhmRemote=null,ruhmRaw=null,ruhmState='loading';
+const normName=n=>String(n||'').trim().replace(/\s+/g,' ').toLowerCase();
+function ruhmLocal(){try{const a=JSON.parse(localStorage.getItem(RKEY));return Array.isArray(a)?a.filter(validEntry):[];}catch(e){return[];}}
+function ruhmLocalSave(a){try{localStorage.setItem(RKEY,JSON.stringify(a));return true;}catch(e){alert('Speichern im Browser ist fehlgeschlagen.');return false;}}
+const validEntry=t=>t&&typeof t==='object'&&Array.isArray(t.platzierung);
+function loadRuhm(){
+  ruhmState='loading';
+  fetch(RUHM_URL,{cache:'no-store'}).then(r=>{if(!r.ok)throw 0;return r.json();})
+    .then(d=>{if(!d||typeof d!=='object'||!Array.isArray(d.turniere))throw 0;ruhmRaw=d;ruhmRemote=d.turniere;ruhmState='ok';render();})
+    .catch(()=>{ruhmRaw=null;ruhmRemote=null;ruhmState='offline';render();});
+}
+const onlineIds=()=>new Set((ruhmRemote||[]).map(t=>t&&t.id).filter(Boolean));
+function ruhmPending(){const on=onlineIds();return ruhmLocal().filter(t=>!on.has(t.id));}
+function ruhmAll(){
+  const on=onlineIds();
+  const all=[...(ruhmRemote||[]).filter(validEntry),...ruhmLocal().filter(t=>!on.has(t.id)).map(t=>({...t,neu:true}))];
+  return all.sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||'')));
+}
+function knownNames(){const m=new Map();ruhmAll().forEach(t=>t.platzierung.forEach(n=>{const k=normName(n);if(k&&!m.has(k))m.set(k,String(n).trim());}));return[...m.values()].sort((a,b)=>a.localeCompare(b,'de'));}
+const todayIso=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const fmtDate=iso=>{const d=new Date(String(iso)+'T12:00');return isNaN(d)?String(iso||''):d.toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'});};
+/* Endplatzierung: Finalisten nach Finalplatz, dann alle anderen nach Liga-Tabelle (inkl. Kopfgeld-Bonus und Stechen) */
+function tournamentRanking(){
+  const fh=finalHeat();if(!fh||!heatComplete(fh))return null;
+  const fin=heatOrder(fh),rest=standings().map(r=>r.id).filter(id=>!fin.includes(id));
+  return[...fin,...rest].map(id=>nameOf(id).trim());
+}
+function eternal(){
+  const m=new Map();
+  ruhmAll().forEach(t=>t.platzierung.forEach((n,i)=>{
+    const k=normName(n);if(!k)return;
+    const e=m.get(k)||{name:String(n).trim(),t:0,g:0,s:0,b:0,sum:0};
+    e.t++;if(i===0)e.g++;if(i===1)e.s++;if(i===2)e.b++;e.sum+=i+1;m.set(k,e);
+  }));
+  return[...m.values()].map(e=>({...e,pod:e.g+e.s+e.b,avg:e.sum/e.t}))
+    .sort((a,b)=>b.g-a.g||b.s-a.s||b.b-a.b||a.avg-b.avg||b.t-a.t||a.name.localeCompare(b.name,'de'));
+}
+function ruhmHtml(editable){
+  const all=ruhmAll(),pend=ruhmPending();
+  let admin='';
+  if(editable){
+    const st=ruhmState==='loading'?`<p class="muted" style="margin-top:0">Online-Datei wird geladen …</p>`
+      :ruhmState==='offline'?`<p class="rwarn">Die Datei ruhmeshalle.json konnte nicht geladen werden (z. B. weil die Seite lokal als Datei geöffnet ist oder offline). Der Download ist gesperrt, damit die bestehende Ruhmeshalle nicht mit einer unvollständigen Datei überschrieben wird.</p>`
+      :`<p class="muted" style="margin-top:0">Online: ${ruhmRemote.length} ${ruhmRemote.length===1?'Turnier':'Turniere'}. ${pend.length?`${pend.length} ${pend.length===1?'Turnier steht':'Turniere stehen'} bisher nur in diesem Browser. Datei herunterladen, im Repo ruhmeshalle.json damit ersetzen und pushen.`:'Nichts Neues, alles ist online.'}</p>`;
+    admin=`<div class="panel"><h3>Ruhmeshalle online aktualisieren</h3>${st}
+      <div class="row"><button class="btn" id="ruhmExp" ${ruhmState==='ok'&&pend.length?'':'disabled'}>ruhmeshalle.json herunterladen</button>${ruhmState==='offline'?'<button class="btn ghost" id="ruhmReload">Erneut laden</button>':''}</div>
+      <p class="note">Die Datei enthält alle Online-Einträge plus die neuen aus diesem Browser. Lokale Einträge bleiben hier gespeichert, bis sie online stehen, auch wenn das Turnier zurückgesetzt wird.</p></div>`;
+  }
+  if(!all.length)return`<div class="panel empty"><p>Noch keine Turniere in der Ruhmeshalle.</p>${editable?'<p class="note">Nach der Siegerehrung lässt sich das Turnier im Turnierbaum eintragen.</p>':''}</div>${admin}`;
+  let et=eternal();const etAll=et.length;if(!editable)et=et.slice(0,10);
+  const table=`<div class="panel"><h3>Ewige Tabelle</h3><div class="scroll"><table><thead><tr><th>Platz</th><th>Name</th><th class="num" title="Siege">🥇</th><th class="num" title="Zweite Plätze">🥈</th><th class="num" title="Dritte Plätze">🥉</th><th class="num">Podien</th><th class="num">Turniere</th><th class="num">Ø Platz</th></tr></thead>
+    <tbody>${et.map((e,i)=>`<tr><td>${badge(i+1)}</td><td>${esc(e.name)}</td><td class="num">${e.g}</td><td class="num">${e.s}</td><td class="num">${e.b}</td><td class="num">${e.pod}</td><td class="num">${e.t}</td><td class="num">${e.avg.toFixed(1).replace('.',',')}</td></tr>`).join('')}</tbody></table></div>
+    ${editable?'<p class="note">Sortiert nach Siegen, dann zweiten und dritten Plätzen, dann Ø-Platz. Namen werden über die Schreibweise zugeordnet (Groß-/Kleinschreibung und Leerzeichen egal).</p>':etAll>et.length?`<p class="note">Top 10 von ${etAll}</p>`:''}</div>`;
+  const shown=editable?all:all.slice(0,5);
+  const list=`<div class="panel"><h3>Bisherige Turniere</h3><div class="hlist">${shown.map(t=>{const p=t.platzierung;return`<div class="hcard"><span class="em" aria-hidden="true">🏆</span><div><b>${esc(t.titel||'Turnier')}</b>${esc(fmtDate(t.datum))}, ${esc(t.teilnehmer||p.length)} Teilnehmer${editable&&t.neu?`<span class="htag">noch nicht online</span><button class="tbbtn del" data-rdel="${esc(t.id)}">Eintrag löschen</button>`:''}
+    <div class="rpod">🥇 ${esc(p[0]||'–')}${p[1]?`&emsp;🥈 ${esc(p[1])}`:''}${p[2]?`&emsp;🥉 ${esc(p[2])}`:''}</div></div></div>`;}).join('')}</div></div>`;
+  return`<div class="rgrid"><div>${table}</div><div>${list}</div></div>${admin}`;
+}
+function archivedEntry(){if(!S.archivedId)return null;return ruhmAll().find(t=>t.id===S.archivedId)||null;}
+function archiveHtml(){
+  const rk=tournamentRanking();if(!rk)return'';
+  const ex=archivedEntry();
+  if(ex){
+    const changed=JSON.stringify(ex.platzierung)!==JSON.stringify(rk);
+    return`<div class="panel"><h3>🏛️ Ruhmeshalle</h3><p class="muted" style="margin:0">Dieses Turnier ist als „${esc(ex.titel||'Turnier')}“ eingetragen${ex.neu?', aber noch nicht online. Im Tab Ruhmeshalle die Datei herunterladen':''}.</p>
+      ${changed?(ex.neu?`<p class="rwarn">Die Platzierung hat sich seit dem Eintragen geändert.</p><div class="row" style="margin-top:10px"><button class="btn" id="arUpd">Eintrag aktualisieren</button></div>`
+        :`<p class="rwarn">Die Platzierung hat sich seit dem Eintragen geändert, der Eintrag ist aber schon online. Korrekturen bitte direkt in ruhmeshalle.json im Repo.</p>`):''}</div>`;
+  }
+  const known=new Set(knownNames().map(normName)),fresh=rk.filter(n=>!known.has(normName(n)));
+  const d=new Date();
+  return`<div class="panel"><h3>🏛️ In die Ruhmeshalle eintragen</h3><div class="row">
+    <input type="text" id="arTitle" data-key="arTitle" value="${esc('Turnier '+d.toLocaleDateString('de-DE',{month:'long',year:'numeric'}))}" aria-label="Name des Turniers">
+    <input type="date" id="arDate" value="${todayIso()}" aria-label="Datum">
+    <button class="btn go" id="arBtn">Eintragen</button></div>
+    <p class="note">Gespeichert wird die Endplatzierung aller ${rk.length} Teilnehmer: Finalisten nach Finalplatz, danach alle anderen nach Liga-Tabelle (mit Kopfgeld-Bonus und Stechen).</p>
+    ${known.size&&fresh.length?`<p class="note">Neu in der Ruhmeshalle: <b>${fresh.map(esc).join(', ')}</b>. Falls jemand schon dabei war, aber anders geschrieben ist, vorher den Namen anpassen, sonst zählt es in der Ewigen Tabelle getrennt.</p>`:''}</div>`;
+}
+function archiveTournament(update){
+  const rk=tournamentRanking();if(!rk)return;
+  const l=ruhmLocal();
+  if(update){const t=l.find(x=>x.id===S.archivedId);if(!t)return;t.platzierung=rk;t.teilnehmer=rk.length;ruhmLocalSave(l);render();return;}
+  const t={id:uid()+Date.now().toString(36),datum:$('arDate').value||todayIso(),titel:$('arTitle').value.trim()||'Turnier',teilnehmer:rk.length,platzierung:rk};
+  l.push(t);if(!ruhmLocalSave(l))return;S.archivedId=t.id;persist();render();
+}
+function renderRuhm(){
+  $('ruhm').innerHTML=`<h2>Ruhmeshalle</h2>${ruhmHtml(true)}`;
+  const e=$('ruhmExp');if(e)e.onclick=()=>{
+    if(ruhmState!=='ok'||!ruhmRaw)return;
+    const on=onlineIds();
+    // Online-Einträge unverändert und in Originalreihenfolge übernehmen, neue hinten anhängen
+    const data={...ruhmRaw,turniere:[...ruhmRaw.turniere,...ruhmLocal().filter(t=>!on.has(t.id))]};
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'}));a.download='ruhmeshalle.json';a.click();
+  };
+  const rl=$('ruhmReload');if(rl)rl.onclick=loadRuhm;
+  $('ruhm').querySelectorAll('[data-rdel]').forEach(b=>b.onclick=()=>{
+    if(!confirm('Diesen Eintrag löschen? Er ist noch nicht online.'))return;
+    ruhmLocalSave(ruhmLocal().filter(t=>t.id!==b.dataset.rdel));render();});
+}
+loadRuhm();
+
 /* ---------- Tabs & Render ---------- */
-const TABS=['teilnehmer','liga','tabelle','finale'];
+const TABS=['teilnehmer','liga','tabelle','finale','ruhm'];
 let tab='teilnehmer';
 function showTab(t){
   if(t==='anzeige'){isDisplay=true;document.body.classList.add('display');TABS.forEach(x=>$(x).classList.remove('on'));$('anzeige').classList.add('on');startRotation();render();return;}
@@ -724,7 +845,7 @@ function render(){
   const n=S.players.length;
   $('brandEdit').innerHTML=brandHtml();
   $('sub').textContent=n?`${n} Teilnehmer, ${S.consoles} ${S.consoles===1?'Konsole':'Konsolen'}, ${S.rounds} Liga-Runden`:'Liga mit wechselnden Gruppen, danach das große Finale.';
-  renderTeilnehmer();renderLiga();renderTabelle();renderFinale();
+  renderTeilnehmer();renderLiga();renderTabelle();renderFinale();renderRuhm();
   if(k){const el=document.querySelector(`[data-key="${CSS.escape(k)}"]`);if(el)el.focus();}
   requestAnimationFrame(drawWires);
 }
