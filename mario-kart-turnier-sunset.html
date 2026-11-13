@@ -246,7 +246,8 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3
 <script>
 const KEY='mk-turnier-v2',RKEY='mk-ruhm-v1';
 const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:3,tb:{}});
-let S=load(), ligaView=0, isDisplay=false, dIndex=0, dTimer=null;
+let S=load(), ligaView=lastRound(), isDisplay=false, dIndex=0, dTimer=null;
+function lastRound(){return Math.max(0,((S&&S.roundsData)||[]).length-1);}
 function load(){try{const l=localStorage.getItem(KEY);if(l)return Object.assign(DEF(),JSON.parse(l));}catch(e){}return DEF();}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 let seenFx=S.fx?S.fx.t:0;
@@ -472,7 +473,7 @@ function renderTeilnehmer(){
   $('bountyOn').onchange=e=>{S.bountyOn=e.target.checked;persist();render();};
   $('bountyPts').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=1&&v<=15)){alert('Bitte einen Bonus zwischen 1 und 15 Punkten eintragen.');e.target.value=bountyPts();return;}S.bountyPts=v;persist();render();};
   $('expBtn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='mario-kart-turnier-stand.json';a.click();};
-  $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=Object.assign(DEF(),d);persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
+  $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=Object.assign(DEF(),d);ligaView=lastRound();persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
   $('logoFile').onchange=e=>{const file=e.target.files[0];if(!file)return;const img=new Image();img.onload=()=>{const k=Math.min(1,360/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);S.logo=c.toDataURL('image/png');persist();render();URL.revokeObjectURL(img.src);};img.src=URL.createObjectURL(file);};
   const ld=$('logoDel');if(ld)ld.onclick=()=>{delete S.logo;persist();render();};
   $('cardsSave').onclick=()=>{const l=$('cardsTa').value.split('\n').map(x=>x.trim()).filter(Boolean);if(l.length<2){alert('Bitte mindestens 2 Karten eintragen.');return;}S.cards=l;persist();render();};
