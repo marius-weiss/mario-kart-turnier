@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-design="standard">
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow">
@@ -39,6 +39,8 @@ nav button,.pill{font:700 15px var(--body);border:3px solid var(--edge);backgrou
 nav button[aria-selected="true"]{background:var(--yellow);color:#1B1D29}
 nav .spacer{flex:1}
 nav .show{background:var(--red);color:#fff}
+.design{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.design select{padding:6px 10px;font-weight:700}
 main{padding:18px 0 70px}
 section{display:none} section.on{display:block}
 h2{font-family:var(--display);font-style:italic;font-weight:900;font-size:24px;margin:4px 0 14px;transform:skewX(-6deg)}
@@ -215,6 +217,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3
       <button role="tab" data-tab="finale">Turnierbaum</button>
       <button role="tab" data-tab="ruhm">Ruhmeshalle</button>
       <span class="spacer"></span>
+      <label class="design" title="Design wechseln">🎨 <select id="designSel" aria-label="Design"></select></label>
       <button class="show" id="openDisplay">Anzeige für Bildschirm öffnen</button>
     </nav>
   </header>
@@ -812,6 +815,16 @@ function renderRuhm(){
     ruhmLocalSave(ruhmLocal().filter(t=>t.id!==b.dataset.rdel));render();});
 }
 loadRuhm();
+
+/* ---------- Design-Auswahl (eine HTML-Datei je Design, Stand liegt gemeinsam in localStorage) ---------- */
+const DESIGNS=[['standard','Standard','mario-kart-turnier.html'],['bayern','Bayern','mario-kart-turnier-bayern.html'],['sunset','Sunset','mario-kart-turnier-sunset.html']];
+const DKEY='mk-design',myDesign=document.documentElement.dataset.design;
+const designFile=k=>(DESIGNS.find(d=>d[0]===k)||DESIGNS[0])[2];
+try{localStorage.setItem(DKEY,myDesign);}catch(e){}
+$('designSel').innerHTML=DESIGNS.map(([k,l])=>`<option value="${k}" ${k===myDesign?'selected':''}>${l}</option>`).join('');
+$('designSel').onchange=e=>{const k=e.target.value;try{localStorage.setItem(DKEY,k);}catch(x){}location.href=designFile(k)+location.hash;};
+// Beamer-Fenster wechselt mit, wenn im Bearbeiten-Fenster ein anderes Design gewählt wird
+window.addEventListener('storage',e=>{if(e.key===DKEY&&isDisplay&&e.newValue&&e.newValue!==myDesign&&DESIGNS.some(d=>d[0]===e.newValue))location.href=designFile(e.newValue)+'#anzeige';});
 
 /* ---------- Tabs & Render ---------- */
 const TABS=['teilnehmer','liga','tabelle','finale','ruhm'];

@@ -5,8 +5,13 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mario Kart Turnier</title>
-<meta http-equiv="refresh" content="0; url=mario-kart-turnier.html">
-<script>location.replace('mario-kart-turnier.html'+location.hash);</script>
+<noscript><meta http-equiv="refresh" content="0; url=mario-kart-turnier.html"></noscript>
+<script>
+// Zuletzt gewähltes Design öffnen (wird in der App gespeichert), sonst Standard
+var f={standard:'mario-kart-turnier.html',bayern:'mario-kart-turnier-bayern.html',sunset:'mario-kart-turnier-sunset.html'},d='standard';
+try{d=localStorage.getItem('mk-design')||d;}catch(e){}
+location.replace((f[d]||f.standard)+location.hash);
+</script>
 <style>body{font:16px/1.5 system-ui,sans-serif;margin:40px 16px;background:#BFE9FF;color:#1B1D29}a{color:#1E7FD8;font-weight:700}</style>
 </head>
 <body>
