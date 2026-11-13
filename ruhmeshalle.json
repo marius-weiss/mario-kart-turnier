@@ -1,3 +1,16 @@
 {
- "turniere": []
+  "turniere": [
+    {"id": "test-2025-03", "datum": "2025-03-21", "titel": "Frühjahrscup 2025", "teilnehmer": 8,
+     "platzierung": ["Anna", "Cem", "Ben", "Jonas", "Dora", "Hugo", "Ida", "Kim"]},
+    {"id": "test-2025-06", "datum": "2025-06-27", "titel": "Sommerfest 2025", "teilnehmer": 10,
+     "platzierung": ["Cem", "Anna", "Gina", "Ben", "Fritz", "Jonas", "Dora", "Emil", "Hugo", "Ida"]},
+    {"id": "test-2025-09", "datum": "2025-09-19", "titel": "Herbst-Grand-Prix 2025", "teilnehmer": 9,
+     "platzierung": ["Ben", "Gina", "Anna", "Cem", "Hugo", "Kim", "Fritz", "Dora", "Emil"]},
+    {"id": "test-2025-12", "datum": "2025-12-12", "titel": "Weihnachtscup 2025", "teilnehmer": 11,
+     "platzierung": ["Anna", "Ben", "jonas ", "Cem", "Gina", "Dora", "Hugo", "Fritz", "Ida", "Emil", "Kim"]},
+    {"id": "test-2026-04", "datum": "2026-04-17", "titel": "Frühjahrscup 2026", "teilnehmer": 7,
+     "platzierung": ["Gina", "Cem", "Anna", "Hugo", "Ben", "Ida", "Dora"]},
+    {"id": "test-2026-07", "datum": "2026-07-10", "titel": "Sommerfest 2026", "teilnehmer": 12,
+     "platzierung": ["Cem", "Jonas", "Ben", "Anna", "Gina", "Emil", "Fritz", "Dora", "Hugo", "Kim", "Ida", "Lars"]}
+  ]
 }
