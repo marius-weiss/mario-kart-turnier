@@ -247,7 +247,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3
 
 <script>
 const KEY='mk-turnier-v2',RKEY='mk-ruhm-v1';
-const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:6,bountyStep:5,bountyNear:5,bountyV:2,tb:{}});
+const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:6,bountyStep:5,bountyNear:5,bountyV:2,jumpGap:15,tb:{}});
 let S=load(), ligaView=lastRound(), isDisplay=false, dIndex=0, dTimer=null, dPaused=false, dStart=0;
 const ROT_MS=15000;
 function lastRound(){return Math.max(0,((S&&S.roundsData)||[]).length-1);}
@@ -298,6 +298,7 @@ const numSet=(v,min,max,def)=>{v=Math.round(+v);return Number.isFinite(v)&&v>=mi
 const bountyPts=()=>numSet(S.bountyPts,0,30,6);
 const bountyStep=()=>numSet(S.bountyStep,0,50,5);
 const bountyNear=()=>numSet(S.bountyNear,0,30,5);
+const jumpGap=()=>numSet(S.jumpGap,1,100,15);
 const bountyList=r=>S.bountyOn===false||!r?[]:Array.isArray(r.bounties)?r.bounties:r.bounty?[{id:r.bounty,lead:+r.bountyLead||0}]:[];
 const bountyExtra=b=>{const st=bountyStep(),l=+b.lead>0?+b.lead:0;return st?Math.min(BOUNTY_EXTRA_MAX,Math.floor(l/st)):0;};
 const bountyValue=b=>bountyPts()+bountyExtra(b);
@@ -313,6 +314,7 @@ function bountyBonus(r,id){
 const fmtNum=v=>String(+(+v).toFixed(2)).replace('.',',');
 function parseEff(text){
   const t=String(text);let m;
+  if(/sprung|springst/i.test(t))return{t:'jump'};
   if((m=t.match(/klau\w*\s+(\d+)/i)))return{t:'steal',v:+m[1]};
   if((m=t.match(/(?:^|\s)[×x]\s*(\d+(?:[.,]\d+)?)/)))return{t:'mult',v:Math.min(5,+m[1].replace(',','.'))};
   if((m=t.match(/\+\s*(\d+)\s*(?:Bonus)?punkt/i)))return{t:'plus',v:+m[1]};
@@ -324,7 +326,7 @@ function luckBonus(ri,id){
   const sc=pid=>{for(const g of r.groups)if(g.members.includes(pid))return typeof g.scores[pid]==='number'?g.scores[pid]:null;return null;};
   let b=0;const mine=sc(id);
   for(const h of list){const e=h.eff;if(!e)continue;
-    if(h.id===id&&mine!==null){if(e.t==='mult')b+=Math.round(mine*(e.v-1));else b+=e.v;}
+    if(h.id===id){if(e.t==='jump')b+=+e.v||0;else if(mine!==null){if(e.t==='mult')b+=Math.round(mine*(e.v-1));else b+=e.v;}}
     if(e.t==='steal'&&e.from===id&&h.id!==id&&sc(h.id)!==null)b-=e.v;}
   return b;
 }
@@ -388,7 +390,7 @@ function tableHtml(editable){
   ${Array.from({length:nR},(_,k)=>`<td class="num">${cell(r,k)}</td>`).join('')}<td class="num total">${r.total}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function bonusChips(bb,lb){
-  return(bb?` <span class="bonus" title="Kopfgeld-Bonus">+${bb}💰</span>`:'')+(lb>0?` <span class="bonus" title="Glücksrad">+${lb}🍀</span>`:lb<0?` <span class="bonus minus" title="Punkteklau">−${-lb}🦝</span>`:'');
+  return(bb?` <span class="bonus" title="Kopfgeld-Bonus">+${bb}💰</span>`:'')+(lb>0?` <span class="bonus" title="Glücksrad (inkl. Sprung nach vorne)">+${lb}🍀</span>`:lb<0?` <span class="bonus minus" title="Punkteklau">−${-lb}🦝</span>`:'');
 }
 function bountyNote(r){
   const l=bountyList(r);if(!l.length)return'';
@@ -499,7 +501,9 @@ function renderTeilnehmer(){
       <label class="btn ghost" style="display:inline-block">${S.logo?'Bild ersetzen':'Eigenes Bild für den Kopf hochladen'}<input type="file" id="logoFile" accept="image/*" hidden></label>
       ${S.logo?'<button class="btn danger" id="logoDel">Bild entfernen</button>':''}
     </div>
-    <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile, mindestens 2 je Rad. Ein Emoji am Anfang erscheint auf dem Rad.</p>
+    <div class="row" style="margin-top:14px"><label>🚀 Sprung nach vorne ab <input type="number" id="jumpGap" min="1" max="100" value="${jumpGap()}"> Punkten Rückstand auf den Vordermann</label></div>
+    <p class="note" style="margin-top:6px">Erst dann landet die Sprung-Karte auf dem Glücksrad. Wer sie zieht, springt auf 1 Punkt vor den Vordermann.</p>
+    <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile, mindestens 2 je Rad. Ein Emoji am Anfang erscheint auf dem Rad. Automatisch verrechnet werden: „×2“, „+5 Punkte“, „klaust 4“ (vom Tabellenführer) und „Sprung“ (auf 1 Punkt vor den Vordermann, nur bei großem Rückstand).</p>
       ${TIERS.map(([k,l,d])=>`<h3 style="margin:14px 0 4px">${esc(l)}</h3><p class="note" style="margin:0 0 6px">${esc(d)}</p><textarea data-tier="${k}" aria-label="Karten ${esc(l)}" style="min-height:120px">${esc(tierCards(k).join('\n'))}</textarea>`).join('')}
       <div class="row" style="margin-top:8px"><button class="btn" id="cardsSave">Karten speichern</button><button class="btn ghost" id="cardsDef">Standardkarten</button></div></details>
     <p class="note">Alles wird nur in diesem Browser auf diesem Gerät gespeichert. Zum Mitnehmen auf ein anderes Gerät: sichern und dort laden.</p>
@@ -520,6 +524,7 @@ function renderTeilnehmer(){
   const numIn=(id,min,max,cur,key,msg)=>{$(id).onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=min&&v<=max)){alert(msg);e.target.value=cur();return;}S[key]=v;persist();render();};};
   numIn('bountyStep',0,50,bountyStep,'bountyStep','Bitte einen Wert zwischen 0 und 50 eintragen (0 = fester Bonus).');
   numIn('bountyNear',0,30,bountyNear,'bountyNear','Bitte einen Wert zwischen 0 und 30 eintragen (0 = kein halbes Kopfgeld).');
+  numIn('jumpGap',1,100,jumpGap,'jumpGap','Bitte einen Wert zwischen 1 und 100 Punkten eintragen.');
   $('bountyPts').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=0&&v<=30)){alert('Bitte einen Bonus zwischen 0 und 30 Punkten eintragen.');e.target.value=bountyPts();return;}S.bountyPts=v;persist();render();};
   $('expBtn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='mario-kart-turnier-stand.json';a.click();};
   $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=migrate(d);ligaView=lastRound();persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
@@ -678,7 +683,8 @@ const DEFAULT_TIERS={
   '🔥 Punkte ×1,5 in dieser Runde',
   '🎁 +10 Punkte geschenkt',
   '🦝 Punkteklau: Du klaust 8 Punkte vom Tabellenführer',
-  '🗺️ Du wählst eine der 4 Strecken, dazu Punkte ×1,5'
+  '🗺️ Du wählst eine der 4 Strecken, dazu Punkte ×1,5',
+  '🚀 Sprung nach vorne: Du springst auf 1 Punkt vor deinen Vordermann'
  ],
  g2:[
   '🔥 Punkte ×1,5 in dieser Runde',
@@ -686,7 +692,8 @@ const DEFAULT_TIERS={
   '🎁 +6 Punkte geschenkt',
   '🦝 Punkteklau: Du klaust 5 Punkte vom Tabellenführer',
   '🛠️ Du stellst das Fahrzeug des Tabellenführers zusammen',
-  '🎒 Du legst die Item-Einstellung für deine Gruppe fest'
+  '🎒 Du legst die Item-Einstellung für deine Gruppe fest',
+  '🚀 Sprung nach vorne: Du springst auf 1 Punkt vor deinen Vordermann'
  ],
  g3:[
   '⚡ Punkte ×1,25 in dieser Runde',
@@ -716,7 +723,9 @@ function handicapRound(){
   for(const x of [R.length+1,R.length])if(x>0&&x<=S.rounds&&S.pen[x]&&!(R[x-1]&&roundComplete(R[x-1])))return x;
   return null;
 }
-const stealNote=h=>h&&h.eff&&h.eff.t==='steal'&&h.eff.from?` (von ${nameOf(h.eff.from)})`:'';
+const stealNote=h=>{const e=h&&h.eff;if(!e)return'';
+  if(e.t==='steal'&&e.from)return` (von ${nameOf(e.from)})`;
+  if(e.t==='jump'&&e.to)return` (+${e.v} Punkte, vor ${nameOf(e.to)})`;return'';};
 function htag(round,id){
   const h=S.pen&&S.pen[round]&&S.pen[round].find(x=>x.id===id);if(!h)return'';
   const c=splitCard(h.card);return`<span class="htag${isBoost(h)?' boost':''}" title="${esc(tierLabel(h.tier))}">${esc((c.em?c.em+' ':'')+c.text+stealNote(h))}</span>`;
@@ -742,7 +751,7 @@ function wheelSvg(cards){
     const [x0,y0]=pt(i*seg-seg/2,R),[x1,y1]=pt(i*seg+seg/2,R);
     const col=(i===n-1&&n%4===1)?cols[2]:cols[i%4];
     s+=`<path d="M0 0L${x0} ${y0}A${R} ${R} 0 0 1 ${x1} ${y1}Z" style="fill:${col}" stroke="#000" stroke-width="2"/>`;
-    const [lx,ly]=pt(i*seg,R*.7),ef=parseEff(c),em=ef&&ef.t!=='steal'?effShort(ef):(splitCard(c).em||String(i+1));
+    const [lx,ly]=pt(i*seg,R*.7),ef=parseEff(c),em=ef&&(ef.t==='mult'||ef.t==='plus')?effShort(ef):(splitCard(c).em||String(i+1));
     s+=`<text x="${lx}" y="${ly}" transform="rotate(${(i*seg).toFixed(2)} ${lx} ${ly})" text-anchor="middle" dominant-baseline="central" font-size="${Math.round(Math.min(26,Math.max(13,150/n)))}" font-weight="900" fill="#1B1D29">${esc(em)}</text>`;
   });
   return`<svg viewBox="-108 -108 216 216" aria-hidden="true"><circle r="106" fill="#000"/>${s}<circle r="15" fill="#fff" stroke="#000" stroke-width="3"/></svg>`;
@@ -788,7 +797,7 @@ function playWheel(fx){
   const run=++wheelRun,box=$('wheelfx');
   const dur=s=>reduce?.4:isLuckTier(s.tier)?2.6:4.2,pause=s=>isLuckTier(s.tier)?2200:3400;
   const cardsOf=s=>Array.isArray(s.cards)&&s.cards.length?s.cards:fx.cards;
-  const victim=s=>s.eff&&s.eff.t==='steal'&&s.eff.from?` (von ${nameOf(s.eff.from)})`:'';
+  const victim=s=>stealNote(s);
   let cards=cardsOf(fx.spins[0]);
   const waitFor=r=>(ms,f)=>setTimeout(()=>{if(r===wheelRun)f();},ms),wait=waitFor(run);
   box.innerHTML=`<div class="wbox"><div class="wfor" id="wFor"></div><div class="wname" id="wName"></div>
@@ -828,9 +837,17 @@ function spinWheel(){
   const wr=wheelRound();if(!wr)return;
   const st=standings(),top=st.slice(0,topCount()),rest=st.slice(top.length),lt=luckTiers(rest),leader=st[0];
   const used={};
-  const pick=(r,tier)=>{const cards=tierCards(tier).slice();used[tier]=used[tier]||shuffle(cards.map((_,i)=>i));
-    const idx=used[tier].length?used[tier].shift():Math.floor(Math.random()*cards.length);
-    const eff=isLuckTier(tier)?parseEff(cards[idx]):null;if(eff&&eff.t==='steal')eff.from=leader.id;
+  const pick=(r,tier)=>{const all=tierCards(tier);used[tier]=used[tier]||shuffle(all.map((_,i)=>i));
+    // Sprung nach vorne nur, wenn der Rückstand auf den Vordermann groß genug ist
+    const pos=st.indexOf(r),ahead=pos>0?st[pos-1]:null,gap=ahead?ahead.total-r.total:0,jumpOk=!!ahead&&gap>=jumpGap();
+    let ok=all.map((_,i)=>i).filter(i=>{const e=isLuckTier(tier)?parseEff(all[i]):null;return!(e&&e.t==='jump')||jumpOk;});
+    if(!ok.length)ok=all.map((_,i)=>i);
+    let pi=used[tier].find(i=>ok.includes(i));
+    if(pi===undefined)pi=ok[Math.floor(Math.random()*ok.length)];else used[tier].splice(used[tier].indexOf(pi),1);
+    const cards=ok.map(i=>all[i]),idx=ok.indexOf(pi);
+    const eff=isLuckTier(tier)?parseEff(cards[idx]):null;
+    if(eff&&eff.t==='steal')eff.from=leader.id;
+    if(eff&&eff.t==='jump'){eff.v=gap+1;eff.to=ahead.id;}
     const o={id:r.id,name:r.name,tier,cards,idx,j:+(Math.random()*2-1).toFixed(3)};if(eff)o.eff=eff;return o;};
   // Handicaps für die Top 3, dann Glück von Platz 4 abwärts
   const spins=[...top.map((r,i)=>pick(r,['schwer','mittel','leicht'][i])),...rest.map((r,i)=>pick(r,lt[i]))];
