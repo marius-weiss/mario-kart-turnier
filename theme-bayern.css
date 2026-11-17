@@ -1,0 +1,15 @@
+/* Design: Bayern (wird nach app.css geladen) */
+/* Theme: Bayern */
+:root{--sky1:#0098D4;--sky2:#E3F4FC;--red:#00427A;--blue:#0098D4;--panel2:#EEF7FC;--road:#244A6B}
+.curb{height:30px;background-color:#FFFFFF;
+  background-image:linear-gradient(135deg,#0098D4 25%,transparent 25%),linear-gradient(225deg,#0098D4 25%,transparent 25%),linear-gradient(315deg,#0098D4 25%,transparent 25%),linear-gradient(45deg,#0098D4 25%,transparent 25%);
+  background-size:40px 28px}
+.logo{color:#FFFFFF;text-shadow:4px 4px 0 #00427A,7px 7px 0 var(--edge)}
+.group.c2 .gh{background:#00427A}
+nav .show{background:#00427A}
+.btn.danger{color:#C8102E} .tie{color:#C8102E}
+.progress i{background:#0098D4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sky1:#06315A;--sky2:#071D36;--panel:#0F2C4D;--panel2:#16406B;--road:#0A1B30;--red:#4FB8F0;--blue:#1E9BD8}
+ :root:not([data-theme="light"]) .group.c2 .gh,:root:not([data-theme="light"]) nav .show{background:#1F5C99}}
+:root[data-theme="dark"]{--sky1:#06315A;--sky2:#071D36;--panel:#0F2C4D;--panel2:#16406B;--road:#0A1B30;--red:#4FB8F0;--blue:#1E9BD8}
+:root{--wire-stops:0 #0098D4, .25 #0098D4, .26 #ffffff, .5 #ffffff, .51 #0098D4, .75 #0098D4, .76 #ffffff, 1 #ffffff;--confetti:#0098D4 #ffffff #00427A #7FCBEB #ffffff #0098D4}
