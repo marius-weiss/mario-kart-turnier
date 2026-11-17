@@ -19,6 +19,9 @@ Statische Web-App für ein Mario-Kart-Turnier (Liga mit wechselnden Gruppen, dan
 - Punkte-Boni (Kopfgeld, Glücksrad) werden immer berechnet und nie in die eingetragenen Rohpunkte gemischt.
 - Kein `*.json` in `.gitignore`, sonst wird `ruhmeshalle.json` nicht committet.
 
+## Offene Aufgaben
+Stehen in `AUFGABEN.md`. Zu Beginn einer Session dort nachsehen und erledigte Punkte abhaken.
+
 ## Branches
 - `main`: Produktion (Cloudflare).
 - `testdaten`: Preview mit Testdaten (`testdaten.html`, befüllte `ruhmeshalle.json`). Nie nach `main` mergen, nur `main` dort hineinmergen.
