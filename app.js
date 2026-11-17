@@ -25,7 +25,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const uid=()=>Math.random().toString(36).slice(2,10);
 const nameOf=id=>{const p=S.players.find(p=>p.id===id);return p?p.name:'?'};
 const brandHtml=()=>`${S.logo?`<img src="${S.logo}" alt="Eigenes Bild">`:''}<h1 class="logo">Mario Kart Turnier</h1>`;
-const badge=(n)=>`<span class="badge ${n<=3?'b'+n:''}">${n}</span>`;
+const badge=(n)=>n>=1&&n<=3?`<span class="medal m${n}"><b>${n}</b></span>`:`<span class="pn">${n}</span>`;
 
 /* ---------- Logik ---------- */
 function groupSizes(n){if(n<=0)return[];const g=Math.ceil(n/4),b=Math.floor(n/g),x=n%g;return Array.from({length:g},(_,i)=>b+(i<x?1:0));}
@@ -149,8 +149,11 @@ function tableHtml(editable){
   const tieCell=r=>r.tie?`<span class="tie">Stechen</span>${editable?`<button class="tbbtn" data-tbwin="${r.id}" aria-label="${esc(r.name)} hat das Stechen gewonnen">hat gewonnen</button>`:''}`
     :r.tieWon?`<span class="tie won">Stechen ✓</span>${editable?`<button class="tbbtn" data-tbreset="${esc(tieSig(r))}" aria-label="Stechen bei ${esc(r.name)} zurücksetzen" title="Stechen zurücksetzen">↺</button>`:''}`:'';
   const cell=(r,k)=>(r.per[k]==null?'–':r.per[k])+bonusChips(r.bb[k],r.lb[k]);
+  // Ziellinie unter dem letzten Platz, der ins Finale bzw. Halbfinale kommt
+  const cut=plan.type!=='direct'&&st.length>plan.qual?plan.qual:-1;
+  const line=`<tr class="cut" aria-hidden="true"><td colspan="${nR+3}"><div class="finish"><span class="up">▲ ${plan.type==='semis'?'Halbfinale':'Finale'}</span><span class="down">Spaßfinale ▼</span></div></td></tr>`;
   return`<div class="scroll"><table><thead><tr><th>Platz</th><th>Name</th>${Array.from({length:nR},(_,i)=>`<th class="num">R${i+1}</th>`).join('')}<th class="num">Gesamt</th></tr></thead>
-  <tbody>${st.map((r,i)=>`<tr class="${i<plan.qual&&plan.type!=='direct'?'qual':''}"><td>${badge(i+1)}</td><td>${esc(r.name)}${tieCell(r)}</td>
+  <tbody>${st.map((r,i)=>`${i===cut?line:''}<tr class="${i<plan.qual&&plan.type!=='direct'?'qual':''}"><td class="place">${badge(i+1)}</td><td class="name">${esc(r.name)}${tieCell(r)}</td>
   ${Array.from({length:nR},(_,k)=>`<td class="num">${cell(r,k)}</td>`).join('')}<td class="num total">${r.total}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function bonusChips(bb,lb){
@@ -159,16 +162,16 @@ function bonusChips(bb,lb){
 function bountyNote(r){
   const l=bountyList(r);if(!l.length)return'';
   const near=bountyNear();
-  return`<p class="bnote">💰 <b>Kopfgeld in jeder Gruppe:</b> Wer mehr Punkte holt als der Träger seiner Gruppe, kassiert das Kopfgeld${near?`, wer höchstens ${near} Punkte dahinter bleibt, die Hälfte`:''}.
-    ${l.map(b=>`<span class="bitem">${esc(nameOf(b.id))} <b>+${bountyValue(b)}</b></span>`).join('')}</p>`;
+  return`<div class="bnote"><b>💰 Kopfgeld</b><span class="t">Schlag den Träger deiner Gruppe und kassiere das Kopfgeld${near?`. Bis ${near} Punkte dahinter gibt’s die Hälfte`:''}.</span>
+    ${l.map(b=>`<span class="bitem">${esc(nameOf(b.id))} <em>+${bountyValue(b)}</em></span>`).join('')}</div>`;
 }
 const MAX_SCORE=60;
 function groupsHtml(r,editable,gIdx){
   return`<div class="groups">${r.groups.map((g,gi)=>`<article class="group c${g.console}">
-    <div class="gh"><h3>Gruppe ${gi+1}</h3><span>Konsole ${g.console} · Durchgang ${g.wave}</span></div>
-    <div class="gb">${g.members.map(id=>`<div class="prow"><span>${esc(nameOf(id))}${isCarrier(r,id)?`<span class="btag" title="Kopfgeld-Träger dieser Gruppe">💰 +${bountyValue(bountyList(r).find(b=>b.id===id))}</span>`:''}${htag(gIdx+1,id)}</span>${editable
+    <div class="gh"><h3>Gruppe ${gi+1}</h3><span class="meta">Konsole ${g.console} · Durchgang ${g.wave}</span></div>
+    <div class="gb">${g.members.map(id=>`<div class="prow"><div class="pmain"><div class="pname">${esc(nameOf(id))}${isCarrier(r,id)?`<span class="btag" title="Kopfgeld-Träger dieser Gruppe">💰 +${bountyValue(bountyList(r).find(b=>b.id===id))}</span>`:''}</div>${htag(gIdx+1,id)}</div>${editable
       ?`<input type="number" min="0" max="${MAX_SCORE}" inputmode="numeric" aria-label="Punkte ${esc(nameOf(id))}" data-key="sc-${gIdx}-${gi}-${id}" data-g="${gi}" data-p="${id}" value="${typeof g.scores[id]==='number'?g.scores[id]:''}">`
-      :`<b>${typeof g.scores[id]==='number'?g.scores[id]+' Pkt.'+bonusChips(bountyBonus(r,id),luckBonus(gIdx,id)):''}</b>`}</div>`).join('')}</div></article>`).join('')}</div>`;
+      :typeof g.scores[id]==='number'?`<span class="pscore">${g.scores[id]}<small> Pkt.</small>${bonusChips(bountyBonus(r,id),luckBonus(gIdx,id))}</span>`:''}</div>`).join('')}</div></article>`).join('')}</div>`;
 }
 function heatNode(h,key,editable,cls,from,placeholder){
   let body;
@@ -200,7 +203,7 @@ function treeHtml(editable){
   const winner=F&&fh&&heatComplete(fh)?heatOrder(fh)[0]:null;
   cols.push(`<div class="tcol"><p class="lbl">Sieger</p><div class="node win" data-node="w" data-from="f"><div class="cup" aria-hidden="true">🏆</div><div class="wn">${winner?esc(nameOf(winner)):'?'}</div></div></div>`);
   let html=`<div class="scroll"><div class="tree">${cols.join('')}<svg class="wires" aria-hidden="true"></svg></div></div>`;
-  if(F&&F.fun.length) html+=`<div class="funwrap"><h3>Spaßfinale, ohne Wertung</h3><div class="groups">${F.fun.map((m,i)=>`<article class="group c${i%S.consoles+1}"><div class="gh"><h3>Spaßgruppe ${i+1}</h3><span>Konsole ${i%S.consoles+1}</span></div><div class="gb">${m.map(id=>`<div class="prow"><span>${esc(nameOf(id))}</span></div>`).join('')}</div></article>`).join('')}</div></div>`;
+  if(F&&F.fun.length) html+=`<div class="funwrap"><h3>Spaßfinale, ohne Wertung</h3><div class="groups">${F.fun.map((m,i)=>`<article class="group c${i%S.consoles+1}"><div class="gh"><h3>Spaßgruppe ${i+1}</h3><span class="meta">Konsole ${i%S.consoles+1}</span></div><div class="gb">${m.map(id=>`<div class="prow"><div class="pname">${esc(nameOf(id))}</div></div>`).join('')}</div></article>`).join('')}</div></div>`;
   return html;
 }
 function drawWires(){
@@ -352,7 +355,7 @@ function draw(){
 function renderTabelle(){
   const plan=planFor(S.players.length);
   $('tabelle').innerHTML=`<h2>Tabelle</h2><div class="panel">${tableHtml(true)}
-  <p class="note">${plan.type!=='direct'?`Grün: Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}Hinter den Rundenpunkten: 💰 Kopfgeld, 🍀 Glücksrad, 🦝 Punkteklau, alles zählt in die Gesamtpunkte. Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
+  <p class="note">${plan.type!=='direct'?`Die Ziellinie trennt die Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}Hinter den Rundenpunkten: 💰 Kopfgeld, 🍀 Glücksrad, 🦝 Punkteklau, alles zählt in die Gesamtpunkte. Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
   $('tabelle').querySelectorAll('[data-tbwin]').forEach(b=>b.onclick=()=>{
     const r=standings().find(x=>x.id===b.dataset.tbwin);if(!r)return;
     const k=tieSig(r);S.tb=S.tb&&typeof S.tb==='object'?S.tb:{};
@@ -394,8 +397,8 @@ function displayViews(){
 function renderDisplay(){
   const views=displayViews();if(dIndex>=views.length)dIndex=0;
   const cur=views[dIndex],R=S.roundsData,last=R[R.length-1];
-  let title='',body='';
-  if(cur==='runde'){title=`Jetzt am Start: Runde ${R.length}`;body=bountyNote(last)+groupsHtml(last,false,R.length-1);}
+  let title='',kicker='',body='';
+  if(cur==='runde'){kicker='Jetzt am Start';title=`Runde ${R.length}`;body=bountyNote(last)+groupsHtml(last,false,R.length-1);}
   if(cur==='tabelle'){title='Tabelle';body=`<div class="panel">${tableHtml()}</div>`;}
   if(cur==='baum'){title='Turnierbaum';body=`<div class="panel">${treeHtml(false)}</div>`;}
   if(cur==='sieger'){title='Siegerehrung';body=podiumHtml();}
@@ -405,8 +408,8 @@ function renderDisplay(){
   $('anzeige').innerHTML=`<div class="dhead"><div class="brand">${brandHtml()}</div>
     <div class="dright">${counter?`<span class="counter">${counter}</span>`:''}<button class="soundbtn" id="pauseBtn" aria-pressed="${dPaused}" title="Rotation anhalten oder fortsetzen (Taste P)">${dPaused?'▶ Weiter':'⏸ Pause'}</button>${audioOn?'':'<button class="soundbtn" id="soundBtn">Ton an</button>'}
     <div class="lights" aria-hidden="true">${views.map((_,i)=>`<i class="${i<=dIndex?'on':''}"></i>`).join('')}</div></div></div>
-    <div class="checker" aria-hidden="true" style="border:3px solid var(--edge);border-radius:6px;margin-bottom:18px"></div>
-    <p class="dtitle">${esc(title)}</p>${body||`<div class="panel empty">Gleich geht’s los.</div>`}
+    <div class="checker dchecker" aria-hidden="true"></div>
+    <h2 class="dtitle">${kicker?`<small>${esc(kicker)}</small>`:''}${esc(title)}</h2>${body||`<div class="panel empty">Gleich geht’s los.</div>`}
     ${dPaused?`<p class="paused">⏸ Pausiert, mit ▶ Weiter oder Taste P geht’s weiter. Pfeiltasten blättern.</p>`
       :`<div class="progress"><i class="run" style="animation-duration:${ROT_MS}ms;animation-delay:-${Math.min(ROT_MS,Date.now()-dStart)}ms"></i></div>`}`;
   const sb=$('soundBtn');if(sb)sb.onclick=()=>{unlockAudio();render();};
@@ -496,7 +499,10 @@ const stealNote=h=>{const e=h&&h.eff;if(!e)return'';
   if(e.t==='jump'&&e.to)return` (+${e.v} Punkte, vor ${nameOf(e.to)})`;return'';};
 function htag(round,id){
   const h=S.pen&&S.pen[round]&&S.pen[round].find(x=>x.id===id);if(!h)return'';
-  const c=splitCard(h.card);return`<span class="htag${isBoost(h)?' boost':''}" title="${esc(tierLabel(h.tier))}">${esc((c.em?c.em+' ':'')+c.text+stealNote(h))}</span>`;
+  // Glücksrad-Ergebnis als ruhige Zeile unter dem Namen; bei Glückskarten mit Punkten der Wert rechts
+  const c=splitCard(h.card),e=h.eff,luck=isBoost(h);
+  const val=!luck||!e?'':e.t==='mult'?'×'+fmtNum(e.v):+e.v>0?'+'+e.v:'';
+  return`<div class="effect${luck?' luck':''}" title="${esc(tierLabel(h.tier))}"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><span>${esc(c.text+stealNote(h))}</span>${val?`<span class="val">${esc(val)}</span>`:''}</div>`;
 }
 function hcardsHtml(round){
   const list=S.pen&&S.pen[round];if(!list||!list.length)return'';
@@ -692,7 +698,7 @@ function ruhmHtml(editable){
   if(!all.length)return`<div class="panel empty"><p>Noch keine Turniere in der Ruhmeshalle.</p>${editable?'<p class="note">Nach der Siegerehrung lässt sich das Turnier im Turnierbaum eintragen.</p>':''}</div>${admin}`;
   let et=eternal();const etAll=et.length;if(!editable)et=et.slice(0,10);
   const table=`<div class="panel"><h3>Ewige Tabelle</h3><div class="scroll"><table><thead><tr><th>Platz</th><th>Name</th><th class="num" title="Siege">🥇</th><th class="num" title="Zweite Plätze">🥈</th><th class="num" title="Dritte Plätze">🥉</th><th class="num">Podien</th><th class="num">Turniere</th><th class="num">Ø Platz</th></tr></thead>
-    <tbody>${et.map((e,i)=>`<tr><td>${badge(i+1)}</td><td>${esc(e.name)}</td><td class="num">${e.g}</td><td class="num">${e.s}</td><td class="num">${e.b}</td><td class="num">${e.pod}</td><td class="num">${e.t}</td><td class="num">${e.avg.toFixed(1).replace('.',',')}</td></tr>`).join('')}</tbody></table></div>
+    <tbody>${et.map((e,i)=>`<tr><td class="place">${badge(i+1)}</td><td class="name">${esc(e.name)}</td><td class="num">${e.g}</td><td class="num">${e.s}</td><td class="num">${e.b}</td><td class="num">${e.pod}</td><td class="num">${e.t}</td><td class="num">${e.avg.toFixed(1).replace('.',',')}</td></tr>`).join('')}</tbody></table></div>
     ${editable?'<p class="note">Sortiert nach Siegen, dann zweiten und dritten Plätzen, dann Ø-Platz. Namen werden über die Schreibweise zugeordnet (Groß-/Kleinschreibung und Leerzeichen egal).</p>':etAll>et.length?`<p class="note">Top 10 von ${etAll}</p>`:''}</div>`;
   const shown=editable?all:all.slice(0,5);
   const list=`<div class="panel"><h3>Bisherige Turniere</h3><div class="hlist">${shown.map(t=>{const p=t.platzierung;return`<div class="hcard"><span class="em" aria-hidden="true">🏆</span><div><b>${esc(t.titel||'Turnier')}</b>${esc(fmtDate(t.datum))}, ${esc(t.teilnehmer||p.length)} Teilnehmer${editable&&t.neu?`<span class="htag">noch nicht online</span><button class="tbbtn del" data-rdel="${esc(t.id)}">Eintrag löschen</button>`:''}

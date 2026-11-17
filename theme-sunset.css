@@ -1,11 +1,13 @@
 /* Design: Sonnenuntergang (wird nach app.css geladen) */
-/* Theme: Sonnenuntergang */
-:root{--sky1:#FF7A45;--sky2:#FFDDA8;--red:#7B3FE4;--blue:#0E9F9A;--yellow:#FFC72C;--panel2:#FFF3E4;--road:#4A2E55}
-.curb{background:repeating-linear-gradient(90deg,#7B3FE4 0 30px,#FFC72C 30px 60px)}
-.logo{color:#FFF6D6;text-shadow:4px 4px 0 #7B3FE4,7px 7px 0 var(--edge)}
-body{background:linear-gradient(180deg,var(--sky1) 0,#FF9E5E 220px,var(--sky2) 560px,var(--sky2) 100%)}
-.btn.danger{color:#D7263D} .tie{color:#D7263D}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sky1:#3A1248;--sky2:#24102F;--panel:#2E1838;--panel2:#3D2148;--road:#1E0F26;--red:#A67BFF;--blue:#2CC7BF}
- :root:not([data-theme="light"]) body{background:linear-gradient(180deg,#5B1E52 0,var(--sky1) 260px,var(--sky2) 620px,var(--sky2) 100%)}}
-:root[data-theme="dark"]{--sky1:#3A1248;--sky2:#24102F;--panel:#2E1838;--panel2:#3D2148;--road:#1E0F26;--red:#A67BFF;--blue:#2CC7BF}
+:root{--bg:#FFF4EA;--surface-2:#FFF5EC;--line:#F0DDCB;--curb:#7B3FE4;--accent:#FF8A4C;--on-accent:#2A1003;--k1:#0E9F9A;--k2:#7B3FE4;
+  --red:#7B3FE4;--blue:#0E9F9A;--yellow:#FFC72C;--road:#4A2E55}
+.curb{background:repeating-linear-gradient(90deg,#7B3FE4 0 28px,#FFC72C 28px 56px)}
+.logo{color:#FFF6D6}
+body{background:linear-gradient(180deg,#FFDCC0 0,var(--bg) 420px) no-repeat,var(--bg)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15111A;--surface:#1E1825;--surface-2:#282030;--line:#382C43;
+  --curb:#9A6BFF;--accent:#FF9A5E;--on-accent:#2A1003;--k1:#2CC7BF;--k2:#A67BFF;--red:#A67BFF;--blue:#2CC7BF;--road:#1E0F26}
+ :root:not([data-theme="light"]) body{background:linear-gradient(180deg,#3A1838 0,var(--bg) 420px) no-repeat,var(--bg)}}
+:root[data-theme="dark"]{--bg:#15111A;--surface:#1E1825;--surface-2:#282030;--line:#382C43;
+  --curb:#9A6BFF;--accent:#FF9A5E;--on-accent:#2A1003;--k1:#2CC7BF;--k2:#A67BFF;--red:#A67BFF;--blue:#2CC7BF;--road:#1E0F26}
+:root[data-theme="dark"] body{background:linear-gradient(180deg,#3A1838 0,var(--bg) 420px) no-repeat,var(--bg)}
 :root{--confetti:#7B3FE4 #FFC72C #FF7A45 #0E9F9A #ffffff #FF4F8B}
