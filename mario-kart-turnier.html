@@ -141,6 +141,9 @@ body.display .podium span{font-size:56px}
 body.display .podium .p1{min-height:320px} body.display .podium .p2{min-height:250px} body.display .podium .p3{min-height:200px}
 .progress{height:6px;background:var(--panel2);border:2px solid var(--edge);border-radius:999px;overflow:hidden;margin-top:18px}
 .progress i{display:block;height:100%;width:0;background:var(--red)}
+.paused{margin:18px 0 0;font-weight:700;color:var(--muted);text-align:center}
+#pauseBtn[aria-pressed="true"]{background:var(--yellow);color:#1B1D29}
+body.display .soundbtn{font-size:18px;padding:8px 18px}
 @media (prefers-reduced-motion:no-preference){.progress i.run{animation:prog linear forwards}@keyframes prog{to{width:100%}}}
 @media (prefers-reduced-motion:no-preference){.wires .rbline{animation:dash 1s linear infinite}@keyframes dash{to{stroke-dashoffset:-16}}}
 @media (max-width:640px){.tree{gap:40px}.tcol{min-width:190px}}
@@ -238,16 +241,17 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3
 <script>
 const KEY='mk-turnier-v2',RKEY='mk-ruhm-v1';
 const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:3,tb:{}});
-let S=load(), ligaView=lastRound(), isDisplay=false, dIndex=0, dTimer=null;
+let S=load(), ligaView=lastRound(), isDisplay=false, dIndex=0, dTimer=null, dPaused=false, dStart=0;
+const ROT_MS=15000;
 function lastRound(){return Math.max(0,((S&&S.roundsData)||[]).length-1);}
 function load(){try{const l=localStorage.getItem(KEY);if(l)return Object.assign(DEF(),JSON.parse(l));}catch(e){}return DEF();}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 let seenFx=S.fx?S.fx.t:0;
 window.addEventListener('storage',e=>{if(e.key===RKEY){render();return;}if(e.key!==KEY)return;S=load();
   if(S.fx&&S.fx.t>seenFx&&Date.now()-S.fx.t<20000){seenFx=S.fx.t;
-    if(S.fx.type==='draw'){playStart(S.fx.round);if(isDisplay){dIndex=0;startRotation();}}
-    if(S.fx.type==='win'){playWin();if(isDisplay){dIndex=0;startRotation();}}
-    if(S.fx.type==='wheel'){playWheel(S.fx);if(isDisplay){dIndex=0;startRotation();}}
+    if(S.fx.type==='draw'){playStart(S.fx.round);if(isDisplay){dIndex=0;resumeRotation();}}
+    if(S.fx.type==='win'){playWin();if(isDisplay){dIndex=0;resumeRotation();}}
+    if(S.fx.type==='wheel'){playWheel(S.fx);if(isDisplay){dIndex=0;resumeRotation();}}
   }
   render();});
 
@@ -565,14 +569,18 @@ function renderDisplay(){
   if(cur==='handicap'){const hr=handicapRound();title=`Handicaps für Runde ${hr}`;body=`<div class="panel">${hcardsHtml(hr)}</div>`;}
   const counter=S.finals?(heatComplete(finalHeat()||{members:[]})?'Ziel!':'Finale'):(R.length?`Runde ${R.length}/${S.rounds}`:'');
   $('anzeige').innerHTML=`<div class="dhead"><div class="brand">${brandHtml()}</div>
-    <div class="dright">${counter?`<span class="counter">${counter}</span>`:''}${audioOn?'':'<button class="soundbtn" id="soundBtn">Ton an</button>'}
+    <div class="dright">${counter?`<span class="counter">${counter}</span>`:''}<button class="soundbtn" id="pauseBtn" aria-pressed="${dPaused}" title="Rotation anhalten oder fortsetzen (Taste P)">${dPaused?'▶ Weiter':'⏸ Pause'}</button>${audioOn?'':'<button class="soundbtn" id="soundBtn">Ton an</button>'}
     <div class="lights" aria-hidden="true">${views.map((_,i)=>`<i class="${i<=dIndex?'on':''}"></i>`).join('')}</div></div></div>
     <div class="checker" aria-hidden="true" style="border:3px solid var(--edge);border-radius:6px;margin-bottom:18px"></div>
     <p class="dtitle">${esc(title)}</p>${body||`<div class="panel empty">Gleich geht’s los.</div>`}
-    <div class="progress"><i class="run" style="animation-duration:15s"></i></div>`;
+    ${dPaused?`<p class="paused">⏸ Pausiert, mit ▶ Weiter oder Taste P geht’s weiter. Pfeiltasten blättern.</p>`
+      :`<div class="progress"><i class="run" style="animation-duration:${ROT_MS}ms;animation-delay:-${Math.min(ROT_MS,Date.now()-dStart)}ms"></i></div>`}`;
   const sb=$('soundBtn');if(sb)sb.onclick=()=>{unlockAudio();render();};
+  $('pauseBtn').onclick=togglePause;
 }
-function startRotation(){clearInterval(dTimer);dTimer=setInterval(()=>{dIndex++;render();},15000);}
+function startRotation(){clearInterval(dTimer);dStart=Date.now();if(!dPaused)dTimer=setInterval(()=>{dIndex++;dStart=Date.now();render();},ROT_MS);}
+function resumeRotation(){dPaused=false;startRotation();}
+function togglePause(){dPaused=!dPaused;startRotation();render();}
 
 
 /* ---------- Glücksrad ---------- */
@@ -839,7 +847,10 @@ function showTab(t){
 }
 document.querySelectorAll('nav [role=tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 $('openDisplay').onclick=()=>{const w=window.open(location.href.split('#')[0]+'#anzeige','mk-anzeige');if(!w)alert('Das Fenster wurde blockiert. Öffne die Datei einfach ein zweites Mal und hänge #anzeige an die Adresse an.');};
-document.addEventListener('keydown',e=>{if(isDisplay&&(e.key==='ArrowRight'||e.key===' ')){dIndex++;startRotation();render();}});
+document.addEventListener('keydown',e=>{if(!isDisplay||e.target.closest&&e.target.closest('button'))return;
+  if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();dIndex++;startRotation();render();}
+  else if(e.key==='ArrowLeft'){const n=displayViews().length;dIndex=(dIndex-1+n)%n;startRotation();render();}
+  else if(e.key==='p'||e.key==='P'||e.key==='k'||e.key==='K'){togglePause();}});
 
 let rq=null;function queueRender(){clearTimeout(rq);rq=setTimeout(render,0);}
 function render(){
