@@ -769,6 +769,24 @@ $('designSel').onchange=e=>{const k=e.target.value;try{localStorage.setItem(DKEY
 // Beamer-Fenster wechselt mit, wenn im Bearbeiten-Fenster ein anderes Design gewählt wird
 window.addEventListener('storage',e=>{if(e.key===DKEY&&isDisplay&&e.newValue&&e.newValue!==myDesign&&DESIGNS.some(d=>d[0]===e.newValue))location.href=designFile(e.newValue)+'#anzeige';});
 
+/* ---------- Hell/Dunkel: System, Hell oder Dunkel, eigener Schlüssel neben dem Turnierstand ----------
+   Das Inline-Skript im <head> setzt data-theme schon vor dem ersten Zeichnen. */
+const TKEY='mk-theme';
+const THEMES=[['system','Wie das Gerät','<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
+  ['light','Hell','<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'],
+  ['dark','Dunkel','<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>']];
+const themeNow=()=>{try{const t=localStorage.getItem(TKEY);return t==='light'||t==='dark'?t:'system';}catch(e){return 'system';}};
+function applyTheme(t){
+  const r=document.documentElement;if(t==='light'||t==='dark')r.setAttribute('data-theme',t);else r.removeAttribute('data-theme');
+  document.querySelectorAll('[data-themeset]').forEach(b=>b.setAttribute('aria-checked',b.dataset.themeset===t));
+  requestAnimationFrame(drawWires);
+}
+$('themeSel').innerHTML=THEMES.map(([k,l,svg])=>`<button type="button" role="radio" data-themeset="${k}" aria-label="${l}" title="${l}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${svg}</svg></button>`).join('');
+$('themeSel').querySelectorAll('[data-themeset]').forEach(b=>b.onclick=()=>{const t=b.dataset.themeset;try{if(t==='system')localStorage.removeItem(TKEY);else localStorage.setItem(TKEY,t);}catch(x){}applyTheme(t);});
+applyTheme(themeNow());
+// Beamer und andere Fenster wechseln live mit
+window.addEventListener('storage',e=>{if(e.key===TKEY||e.key===null)applyTheme(themeNow());});
+
 /* ---------- Tabs & Render ---------- */
 const TABS=['teilnehmer','liga','tabelle','finale','ruhm'];
 let tab='teilnehmer';
