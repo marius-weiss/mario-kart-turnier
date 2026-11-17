@@ -202,9 +202,42 @@ tr.cut td{padding:7px 0;border:0;background:none}
 .hcard b .btag{margin-left:8px;vertical-align:2px}
 .hcard .tier{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
 .hcard.boost .tier{color:var(--good)}
-.cprev{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
-.cprev .cp{font-size:12px;font-weight:700;border:1px solid var(--line);border-radius:999px;padding:1px 9px;background:var(--surface-2);color:var(--muted)}
-.cprev .cp.on{background:var(--good-bg);color:var(--good);border-color:transparent}
+/* Karteneditor Glücksrad */
+.ctabs{display:flex;flex-wrap:wrap;gap:10px 18px;margin:8px 0 2px}
+.cgrp{display:flex;flex-direction:column;gap:4px;max-width:100%}
+.cgrp>span{font-size:12px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.ctabs .seg{flex-wrap:wrap}
+.ctabs .seg button{min-width:0;font-size:15px;display:inline-flex;align-items:center;gap:7px}
+.ctabs .seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line),0 1px 3px rgba(0,0,0,.14)}
+.ctabs .cn{font-size:12px;font-weight:800;line-height:18px;padding:0 7px;border-radius:999px;color:var(--muted);background:color-mix(in srgb,var(--line) 70%,transparent)}
+.chead{margin:12px 0 8px}
+.chead b{color:var(--ink)}
+.cmod{color:var(--accent);font-weight:800}
+.clist{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.crow{display:flex;align-items:center;gap:12px;min-height:52px;padding:7px 8px 7px 14px;background:var(--surface)}
+.crow+.crow{border-top:1px solid var(--line)}
+.cem{flex:none;width:28px;text-align:center;font-size:20px}
+.cbody{flex:1;min-width:0;display:flex;align-items:center;gap:12px}
+.ctx{flex:1;min-width:0;font-weight:600;line-height:1.35}
+.ctag{flex:none;white-space:nowrap;font-size:13px;font-weight:800;padding:2px 10px;border-radius:999px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line)}
+.ctag.on{color:var(--good);background:var(--good-bg);border-color:transparent}
+.cbtn{flex:none;width:36px;height:36px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--faint);font:800 18px/1 var(--font);cursor:pointer}
+.cbtn:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+.cbtn.del:hover:not(:disabled){background:var(--bad-bg);color:var(--bad)}
+.cbtn:disabled{opacity:.3;cursor:not-allowed}
+.crow.edit{flex-wrap:wrap;gap:8px;padding:10px 12px;background:var(--surface-2)}
+.crow.edit input[type=text]{background:var(--surface)}
+.settings input.cem-in{flex:none;width:58px;min-width:0;padding:9px 4px;text-align:center;font-size:18px}
+.settings input.ctx-in{flex:1 1 220px;min-width:0}
+.crow.edit .chint{flex-basis:100%;margin:0}
+.cadd{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chint{margin-top:6px;font-size:14px;font-weight:600;color:var(--muted)}
+.chint.on{color:var(--good)}
+.cfoot{justify-content:space-between;margin-top:6px}
+.cfoot .note{flex:1 1 300px}
+@media (max-width:520px){
+  .ctabs .seg{flex-wrap:nowrap}.ctabs .seg button{padding:7px 9px;gap:5px;font-size:14px}
+  .crow{gap:6px;padding-left:10px}.cbody{flex-direction:column;align-items:flex-start;gap:4px}.cbtn{width:32px}}
 .jw{width:70px}
 
 /* Turnierbaum */
