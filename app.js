@@ -232,8 +232,14 @@ function drawWires(){
 window.addEventListener('resize',drawWires);
 
 /* ---------- Bearbeiten ---------- */
+/* Einstellungszeile: Beschriftung links, Steuerelement rechts */
+const srow=(label,hint,ctrl,off)=>`<div class="srow${off?' off':''}"><div class="slabel"><b>${label}</b>${hint?`<small>${hint}</small>`:''}</div><div class="sctrl">${ctrl}</div></div>`;
+/* Auswahl als Segmente statt Dropdown */
+const seg=(key,label,vals,cur)=>`<div class="seg" role="radiogroup" aria-label="${label}">${vals.map(v=>`<button type="button" role="radio" data-set="${key}" data-v="${v}" data-key="seg-${key}-${v}" aria-checked="${+cur===v}">${v}</button>`).join('')}</div>`;
+/* Zahl mit − und + statt Pfeiltasten im Feld */
+const stepper=(id,v,min,max,unit,label,dis,attrs)=>`<div class="stepper"><button type="button" class="sb" data-d="-1" data-key="sb-${id}-" aria-label="${label} verringern" ${dis||v<=min?'disabled':''}>−</button><input type="number" ${attrs||`id="${id}"`} data-key="in-${id}" min="${min}" max="${max}" inputmode="numeric" value="${v}" aria-label="${label}" ${dis?'disabled':''}><button type="button" class="sb" data-d="1" data-key="sb-${id}+" aria-label="${label} erhöhen" ${dis||v>=max?'disabled':''}>+</button>${unit?`<span class="unit">${unit}</span>`:''}</div>`;
 function renderTeilnehmer(){
-  const n=S.players.length,plan=planFor(n),e=estimate(n),started=S.roundsData.length>0;
+  const n=S.players.length,plan=planFor(n),e=estimate(n),started=S.roundsData.length>0,bOn=S.bountyOn!==false;
   $('teilnehmer').innerHTML=`
   <div class="panel"><h2>Wer fährt mit?</h2>
     <div class="row"><input type="text" id="newName" data-key="newName" placeholder="Name eintragen, Enter drücken" aria-label="Name" list="ruhmNames" autocomplete="off"><datalist id="ruhmNames">${knownNames().filter(k=>!S.players.some(p=>normName(p.name)===normName(k))).map(k=>`<option value="${esc(k)}">`).join('')}</datalist><button class="btn go" id="addBtn">Hinzufügen</button></div>
@@ -252,34 +258,39 @@ function renderTeilnehmer(){
       <div><b>${plan.type==='semis'?'HF + Finale':plan.type==='direct'?'Finale':'Top 4'}</b>${esc(plan.text)}</div>
       <div><b>~${Math.round(e.total/5)*5} min</b>geschätzt, ${e.w} ${e.w===1?'Durchgang':'Durchgänge'} pro Runde</div></div>`}
   </div>
-  <div class="panel"><h2>Einstellungen</h2>
-    <div class="row">
-      <label>Konsolen <select id="consoles"><option value="1" ${S.consoles==1?'selected':''}>1</option><option value="2" ${S.consoles==2?'selected':''}>2</option></select></label>
-      <label>Liga-Runden <select id="rounds">${[2,3,4].map(r=>`<option ${S.rounds==r?'selected':''}>${r}</option>`).join('')}</select></label>
+  <div class="panel settings"><h2>Einstellungen</h2>
+    <div class="sgroup"><h3>Ablauf</h3>
+      ${srow('Konsolen','Wie viele Gruppen gleichzeitig fahren',seg('consoles','Konsolen',[1,2],S.consoles))}
+      ${srow('Liga-Runden','Jede Runde mit neu ausgelosten Gruppen',seg('rounds','Liga-Runden',[2,3,4],S.rounds))}
     </div>
-    <div class="row" style="margin-top:14px">
-      <label><input type="checkbox" id="bountyOn" ${S.bountyOn!==false?'checked':''}> 💰 Kopfgeld auf den Tabellenführer (ab Runde 2)</label>
-      <label>Grundbonus <input type="number" id="bountyPts" min="0" max="30" value="${bountyPts()}" ${S.bountyOn!==false?'':'disabled'}> Pkt.</label>
-      <label>+1 je <input type="number" id="bountyStep" min="0" max="50" value="${bountyStep()}" ${S.bountyOn!==false?'':'disabled'}> Pkt. Vorsprung</label>
-      <label>Halbes Kopfgeld bis <input type="number" id="bountyNear" min="0" max="30" value="${bountyNear()}" ${S.bountyOn!==false?'':'disabled'}> Pkt. dahinter</label>
+    <div class="sgroup"><h3>💰 Kopfgeld</h3>
+      ${srow('Kopfgeld','Ab Runde 2 trägt in jeder Gruppe der Bestplatzierte der Tabelle das Kopfgeld',`<label class="switch"><input type="checkbox" role="switch" id="bountyOn" data-key="bountyOn" aria-label="Kopfgeld" ${bOn?'checked':''}><span></span></label>`)}
+      ${srow('Grundbonus','Für alle, die den Träger in ihrer Gruppe schlagen',stepper('bountyPts',bountyPts(),0,30,'Pkt.','Grundbonus',!bOn),!bOn)}
+      ${srow('Vorsprungs-Bonus',`+1 je so viele Punkte Vorsprung des Trägers auf den Nächsten (höchstens +${BOUNTY_EXTRA_MAX}, 0 = fester Bonus)`,stepper('bountyStep',bountyStep(),0,50,'Pkt.','Punkte je Bonusstufe',!bOn),!bOn)}
+      ${srow('Halbes Kopfgeld','Für alle, die höchstens so weit hinter dem Träger landen (0 = aus)',stepper('bountyNear',bountyNear(),0,30,'Pkt.','Abstand für halbes Kopfgeld',!bOn),!bOn)}
     </div>
-    <p class="note" style="margin-top:6px">In jeder Gruppe trägt der in der Tabelle Bestplatzierte das Kopfgeld. Wer ihn schlägt, bekommt Grundbonus + 1 je Vorsprungsstufe auf den Nächsten seiner Gruppe (höchstens +${BOUNTY_EXTRA_MAX}). Wer knapp dahinter bleibt, bekommt die Hälfte (0 = aus).</p>
-    <div class="row" style="margin-top:14px">
-      <label class="btn ghost" style="display:inline-block">${S.logo?'Bild ersetzen':'Eigenes Bild für den Kopf hochladen'}<input type="file" id="logoFile" accept="image/*" hidden></label>
-      ${S.logo?'<button class="btn danger" id="logoDel">Bild entfernen</button>':''}
+    <div class="sgroup"><h3>🚀 Sprung nach vorne</h3>
+      ${srow('Ab Rückstand','So weit muss jemand hinter dem Vordermann liegen, damit der Sprung aufs Rad kommt',stepper('jumpGap',jumpGap(),1,100,'Pkt.','Rückstand für den Sprung'))}
+      ${['Letzter','Vorletzter','Drittletzter'].map((l,i)=>srow(`Felder für ${l}`,i?'':'Mehr Felder heißt höhere Chance',stepper(`jw${i}`,jumpW()[i],0,10,'Felder',`Sprung-Felder ${l}`,false,`class="jw" data-i="${i}"`))).join('')}
+      <p class="note">Nur die letzten 3 der Tabelle können springen. Wer den Sprung zieht, landet 1 Punkt vor seinem Vordermann.</p>
     </div>
-    <div class="row" style="margin-top:14px"><label>🚀 Sprung nach vorne ab <input type="number" id="jumpGap" min="1" max="100" value="${jumpGap()}"> Punkten Rückstand auf den Vordermann</label></div>
-    <div class="row" style="margin-top:8px">Sprung-Felder auf dem Rad:
-      ${['Letzter','Vorletzter','Drittletzter'].map((l,i)=>`<label>${l} <input type="number" class="jw" data-i="${i}" min="0" max="10" value="${jumpW()[i]}"></label>`).join('')}</div>
-    <p class="note" style="margin-top:6px">Nur die letzten 3 der Tabelle können springen, und nur wenn ihr Rückstand auf den Vordermann groß genug ist. Mehr Felder heißt höhere Chance. Wer den Sprung zieht, landet 1 Punkt vor seinem Vordermann.</p>
+    <div class="sgroup"><h3>🎡 Glücksrad</h3>
     <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile, mindestens 2 je Rad. Ein Emoji am Anfang erscheint auf dem Rad. Die Punkte rechnet die App selbst aus dem Kartentext aus (nur bei den Glücks-Rädern): „×3“ multipliziert die Rundenpunkte (höchstens ×5), „+5 Punkte“ schenkt Punkte, „klaust 4“ nimmt sie dem Tabellenführer weg. Alles andere ist eine Spielregel ohne Punkte. Die Vorschau unter jedem Feld zeigt, was erkannt wird. Bereits gedrehte Ergebnisse bleiben, wie sie gezogen wurden.</p>
       ${TIERS.map(([k,l,d])=>`<h3 style="margin:14px 0 4px">${esc(l)}</h3><p class="note" style="margin:0 0 6px">${esc(d)}</p><textarea data-tier="${k}" aria-label="Karten ${esc(l)}" style="min-height:120px">${esc(tierCards(k).join('\n'))}</textarea><div class="cprev" data-prev="${k}">${cardPreview(tierCards(k).join('\n'),k)}</div>`).join('')}
       <div class="row" style="margin-top:8px"><button class="btn" id="cardsSave">Karten speichern</button><button class="btn ghost" id="cardsDef">Standardkarten</button></div></details>
-    <p class="note">Alles wird nur in diesem Browser auf diesem Gerät gespeichert. Zum Mitnehmen auf ein anderes Gerät: sichern und dort laden.</p>
-    <div class="row" style="margin-top:10px">
-      <button class="btn ghost" id="expBtn">Stand sichern (Datei)</button>
-      <label class="btn ghost" style="display:inline-block">Stand laden<input type="file" id="impFile" accept="application/json,.json" hidden></label>
-      <button class="btn danger" id="resetBtn">Turnier zurücksetzen</button>
+    </div>
+    <div class="sgroup"><h3>Kopfbild</h3>
+      ${srow('Eigenes Bild','Erscheint oben neben dem Titel, auch auf dem Beamer',`<div class="row">
+        <label class="btn ghost" style="display:inline-block">${S.logo?'Bild ersetzen':'Bild hochladen'}<input type="file" id="logoFile" accept="image/*" hidden></label>
+        ${S.logo?'<button class="btn danger" id="logoDel">Entfernen</button>':''}</div>`)}
+    </div>
+    <div class="sgroup"><h3>Daten</h3>
+      <p class="note" style="margin:0 0 12px">Alles wird nur in diesem Browser auf diesem Gerät gespeichert. Zum Mitnehmen auf ein anderes Gerät: sichern und dort laden.</p>
+      <div class="row">
+        <button class="btn ghost" id="expBtn">Stand sichern (Datei)</button>
+        <label class="btn ghost" style="display:inline-block">Stand laden<input type="file" id="impFile" accept="application/json,.json" hidden></label>
+        <button class="btn danger" id="resetBtn">Turnier zurücksetzen</button>
+      </div>
     </div>
   </div>`;
   const addNames=list=>{let c=0;for(let v of list){v=v.trim();if(!v||S.players.some(p=>p.name.toLowerCase()===v.toLowerCase()))continue;S.players.push({id:uid(),name:v});c++;}if(c){persist();}render();};
@@ -287,8 +298,9 @@ function renderTeilnehmer(){
   $('newName').onkeydown=e=>{if(e.key==='Enter'){addNames([e.target.value]);$('newName').focus();}};
   $('bulkBtn').onclick=()=>addNames($('bulk').value.split(/[\n,;]+/));
   $('teilnehmer').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{S.players=S.players.filter(p=>p.id!==b.dataset.del);persist();render();});
-  $('consoles').onchange=e=>{S.consoles=+e.target.value;persist();render();};
-  $('rounds').onchange=e=>{S.rounds=+e.target.value;persist();render();};
+  $('teilnehmer').querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const k=b.dataset.set,v=+b.dataset.v;if(S[k]===v)return;S[k]=v;persist();render();});
+  $('teilnehmer').querySelectorAll('.stepper .sb').forEach(b=>b.onclick=()=>{const inp=b.parentNode.querySelector('input'),v=Math.round(+inp.value||0)+ +b.dataset.d;
+    inp.value=Math.min(+inp.max,Math.max(+inp.min,v));inp.dispatchEvent(new Event('change'));});
   $('bountyOn').onchange=e=>{S.bountyOn=e.target.checked;persist();render();};
   const numIn=(id,min,max,cur,key,msg)=>{$(id).onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=min&&v<=max)){alert(msg);e.target.value=cur();return;}S[key]=v;persist();render();};};
   numIn('bountyStep',0,50,bountyStep,'bountyStep','Bitte einen Wert zwischen 0 und 50 eintragen (0 = fester Bonus).');
