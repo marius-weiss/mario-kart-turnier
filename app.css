@@ -52,6 +52,9 @@ nav .spacer{flex:1}
 .tabs button{font:700 15px var(--font);color:var(--muted);background:transparent;border:0;border-radius:999px;padding:7px 16px;cursor:pointer;white-space:nowrap;flex:none}
 .tabs button:hover{color:var(--ink)}
 .tabs button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.themesel.seg{background:var(--surface);border-radius:999px;padding:3px}
+.themesel.seg button{min-width:0;padding:6px 10px;border-radius:999px;display:grid;place-items:center}
+.themesel.seg button[aria-checked="true"]{background:var(--surface-2);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
 .design{display:inline-flex;align-items:center;gap:6px;font-weight:700}
 .design select{padding:7px 10px;font-weight:700}
 nav .show{font:800 15px var(--font);border:0;border-radius:12px;padding:10px 16px;cursor:pointer;background:var(--curb);color:#fff;box-shadow:0 3px 0 color-mix(in srgb,var(--curb) 60%,#000)}
