@@ -211,6 +211,10 @@ body.display .btag{font-size:16px}
 .tie.won{color:var(--green)}
 .htag.boost{background:var(--green);color:#fff}
 .bonus.minus{color:var(--red)}
+.cprev{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}
+.cprev .cp{font-size:12px;font-weight:700;border:2px solid var(--edge);border-radius:8px;padding:1px 8px;background:var(--panel2);color:var(--muted)}
+.cprev .cp.on{background:var(--green);color:#fff}
+.jw{width:70px}
 .bnote .bitem{display:inline-block;margin:4px 10px 0 0;background:var(--panel);border:2px solid var(--edge);border-radius:999px;padding:0 10px;white-space:nowrap}
 .hlist{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
 .hcard.boost{background:color-mix(in srgb,var(--green) 18%,var(--panel2))}
@@ -258,7 +262,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3
 
 <script>
 const KEY='mk-turnier-v2',RKEY='mk-ruhm-v1';
-const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:6,bountyStep:5,bountyNear:5,bountyV:2,jumpGap:15,tb:{}});
+const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:6,bountyStep:5,bountyNear:5,bountyV:2,jumpGap:15,jumpW:[3,2,1],tb:{}});
 let S=load(), ligaView=lastRound(), isDisplay=false, dIndex=0, dTimer=null, dPaused=false, dStart=0;
 const ROT_MS=15000;
 function lastRound(){return Math.max(0,((S&&S.roundsData)||[]).length-1);}
@@ -310,6 +314,9 @@ const bountyPts=()=>numSet(S.bountyPts,0,30,6);
 const bountyStep=()=>numSet(S.bountyStep,0,50,5);
 const bountyNear=()=>numSet(S.bountyNear,0,30,5);
 const jumpGap=()=>numSet(S.jumpGap,1,100,15);
+/* Sprung nach vorne: Felder auf dem Rad für Letzten, Vorletzten, Drittletzten */
+const jumpW=()=>[3,2,1].map((d,i)=>numSet(Array.isArray(S.jumpW)?S.jumpW[i]:d,0,10,d));
+const JUMP_CARD='🚀 Sprung nach vorne: Du springst auf 1 Punkt vor deinen Vordermann';
 const bountyList=r=>S.bountyOn===false||!r?[]:Array.isArray(r.bounties)?r.bounties:r.bounty?[{id:r.bounty,lead:+r.bountyLead||0}]:[];
 const bountyExtra=b=>{const st=bountyStep(),l=+b.lead>0?+b.lead:0;return st?Math.min(BOUNTY_EXTRA_MAX,Math.floor(l/st)):0;};
 const bountyValue=b=>bountyPts()+bountyExtra(b);
@@ -330,6 +337,13 @@ function parseEff(text){
   if((m=t.match(/(?:^|\s)[×x]\s*(\d+(?:[.,]\d+)?)/)))return{t:'mult',v:Math.min(5,+m[1].replace(',','.'))};
   if((m=t.match(/\+\s*(\d+)\s*(?:Bonus)?punkt/i)))return{t:'plus',v:+m[1]};
   return null;
+}
+function cardPreview(text,tier){
+  const luck=isLuckTier(tier);
+  return String(text).split('\n').map(x=>x.trim()).filter(Boolean).map(c=>{
+    const e=luck?parseEff(c):null,sc=splitCard(c);
+    const what=!luck?'Handicap, keine Punkte':!e?'Spielregel, keine Punkte':e.t==='mult'?`Rundenpunkte ×${fmtNum(e.v)}${e.v>=5?' (Maximum)':''}`:e.t==='plus'?`+${e.v} Punkte`:e.t==='steal'?`${e.v} Punkte vom Tabellenführer`:'Sprung wird gesondert vergeben, Zeile wird ignoriert';
+    return`<span class="cp${e?' on':''}">${esc(sc.em||'•')} ${esc(what)}</span>`;}).join('');
 }
 const effShort=e=>!e?'':e.t==='mult'?'×'+fmtNum(e.v):e.t==='plus'?'+'+e.v:'−'+e.v;
 function luckBonus(ri,id){
@@ -513,9 +527,11 @@ function renderTeilnehmer(){
       ${S.logo?'<button class="btn danger" id="logoDel">Bild entfernen</button>':''}
     </div>
     <div class="row" style="margin-top:14px"><label>🚀 Sprung nach vorne ab <input type="number" id="jumpGap" min="1" max="100" value="${jumpGap()}"> Punkten Rückstand auf den Vordermann</label></div>
-    <p class="note" style="margin-top:6px">Erst dann landet die Sprung-Karte auf dem Glücksrad. Wer sie zieht, springt auf 1 Punkt vor den Vordermann.</p>
-    <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile, mindestens 2 je Rad. Ein Emoji am Anfang erscheint auf dem Rad. Automatisch verrechnet werden: „×2“, „+5 Punkte“, „klaust 4“ (vom Tabellenführer) und „Sprung“ (auf 1 Punkt vor den Vordermann, nur bei großem Rückstand).</p>
-      ${TIERS.map(([k,l,d])=>`<h3 style="margin:14px 0 4px">${esc(l)}</h3><p class="note" style="margin:0 0 6px">${esc(d)}</p><textarea data-tier="${k}" aria-label="Karten ${esc(l)}" style="min-height:120px">${esc(tierCards(k).join('\n'))}</textarea>`).join('')}
+    <div class="row" style="margin-top:8px">Sprung-Felder auf dem Rad:
+      ${['Letzter','Vorletzter','Drittletzter'].map((l,i)=>`<label>${l} <input type="number" class="jw" data-i="${i}" min="0" max="10" value="${jumpW()[i]}"></label>`).join('')}</div>
+    <p class="note" style="margin-top:6px">Nur die letzten 3 der Tabelle können springen, und nur wenn ihr Rückstand auf den Vordermann groß genug ist. Mehr Felder heißt höhere Chance. Wer den Sprung zieht, landet 1 Punkt vor seinem Vordermann.</p>
+    <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile, mindestens 2 je Rad. Ein Emoji am Anfang erscheint auf dem Rad. Die Punkte rechnet die App selbst aus dem Kartentext aus (nur bei den Glücks-Rädern): „×3“ multipliziert die Rundenpunkte (höchstens ×5), „+5 Punkte“ schenkt Punkte, „klaust 4“ nimmt sie dem Tabellenführer weg. Alles andere ist eine Spielregel ohne Punkte. Die Vorschau unter jedem Feld zeigt, was erkannt wird. Bereits gedrehte Ergebnisse bleiben, wie sie gezogen wurden.</p>
+      ${TIERS.map(([k,l,d])=>`<h3 style="margin:14px 0 4px">${esc(l)}</h3><p class="note" style="margin:0 0 6px">${esc(d)}</p><textarea data-tier="${k}" aria-label="Karten ${esc(l)}" style="min-height:120px">${esc(tierCards(k).join('\n'))}</textarea><div class="cprev" data-prev="${k}">${cardPreview(tierCards(k).join('\n'),k)}</div>`).join('')}
       <div class="row" style="margin-top:8px"><button class="btn" id="cardsSave">Karten speichern</button><button class="btn ghost" id="cardsDef">Standardkarten</button></div></details>
     <p class="note">Alles wird nur in diesem Browser auf diesem Gerät gespeichert. Zum Mitnehmen auf ein anderes Gerät: sichern und dort laden.</p>
     <div class="row" style="margin-top:10px">
@@ -541,6 +557,10 @@ function renderTeilnehmer(){
   $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=migrate(d);ligaView=lastRound();persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
   $('logoFile').onchange=e=>{const file=e.target.files[0];if(!file)return;const img=new Image();img.onload=()=>{const k=Math.min(1,360/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);S.logo=c.toDataURL('image/png');persist();render();URL.revokeObjectURL(img.src);};img.src=URL.createObjectURL(file);};
   const ld=$('logoDel');if(ld)ld.onclick=()=>{delete S.logo;persist();render();};
+  $('teilnehmer').querySelectorAll('.jw').forEach(inp=>inp.onchange=()=>{const v=Math.round(+inp.value);
+    if(!(v>=0&&v<=10)){alert('Bitte 0 bis 10 Felder eintragen.');inp.value=jumpW()[+inp.dataset.i];return;}
+    const w=jumpW();w[+inp.dataset.i]=v;S.jumpW=w;persist();render();});
+  $('teilnehmer').querySelectorAll('textarea[data-tier]').forEach(ta=>ta.oninput=()=>{const pv=$('teilnehmer').querySelector(`[data-prev="${ta.dataset.tier}"]`);if(pv)pv.innerHTML=cardPreview(ta.value,ta.dataset.tier);});
   $('cardsSave').onclick=()=>{const t={};
     for(const ta of $('teilnehmer').querySelectorAll('textarea[data-tier]')){const l=ta.value.split('\n').map(x=>x.trim()).filter(Boolean);
       if(l.length<2){alert(`Bitte bei „${TIERS.find(x=>x[0]===ta.dataset.tier)[1]}“ mindestens 2 Karten eintragen.`);return;}t[ta.dataset.tier]=l;}
@@ -694,8 +714,7 @@ const DEFAULT_TIERS={
   '🔥 Punkte ×1,5 in dieser Runde',
   '🎁 +10 Punkte geschenkt',
   '🦝 Punkteklau: Du klaust 8 Punkte vom Tabellenführer',
-  '🗺️ Du wählst eine der 4 Strecken, dazu Punkte ×1,5',
-  '🚀 Sprung nach vorne: Du springst auf 1 Punkt vor deinen Vordermann'
+  '🗺️ Du wählst eine der 4 Strecken, dazu Punkte ×1,5'
  ],
  g2:[
   '🔥 Punkte ×1,5 in dieser Runde',
@@ -703,8 +722,7 @@ const DEFAULT_TIERS={
   '🎁 +6 Punkte geschenkt',
   '🦝 Punkteklau: Du klaust 5 Punkte vom Tabellenführer',
   '🛠️ Du stellst das Fahrzeug des Tabellenführers zusammen',
-  '🎒 Du legst die Item-Einstellung für deine Gruppe fest',
-  '🚀 Sprung nach vorne: Du springst auf 1 Punkt vor deinen Vordermann'
+  '🎒 Du legst die Item-Einstellung für deine Gruppe fest'
  ],
  g3:[
   '⚡ Punkte ×1,25 in dieser Runde',
@@ -848,17 +866,29 @@ function spinWheel(){
   const wr=wheelRound();if(!wr)return;
   const st=standings(),top=st.slice(0,topCount()),rest=st.slice(top.length),lt=luckTiers(rest),leader=st[0];
   const used={};
-  const pick=(r,tier)=>{const all=tierCards(tier);used[tier]=used[tier]||shuffle(all.map((_,i)=>i));
-    // Sprung nach vorne nur, wenn der Rückstand auf den Vordermann groß genug ist
-    const pos=st.indexOf(r),ahead=pos>0?st[pos-1]:null,gap=ahead?ahead.total-r.total:0,jumpOk=!!ahead&&gap>=jumpGap();
-    let ok=all.map((_,i)=>i).filter(i=>{const e=isLuckTier(tier)?parseEff(all[i]):null;return!(e&&e.t==='jump')||jumpOk;});
-    if(!ok.length)ok=all.map((_,i)=>i);
-    let pi=used[tier].find(i=>ok.includes(i));
-    if(pi===undefined)pi=ok[Math.floor(Math.random()*ok.length)];else used[tier].splice(used[tier].indexOf(pi),1);
-    const cards=ok.map(i=>all[i]),idx=ok.indexOf(pi);
-    const eff=isLuckTier(tier)?parseEff(cards[idx]):null;
+  const W=jumpW();
+  const pick=(r,tier)=>{
+    const luck=isLuckTier(tier),isJump=c=>{const e=parseEff(c);return!!e&&e.t==='jump';};
+    // Sprung-Karten aus eigenen Listen ignorieren, der Sprung wird unten gesondert vergeben
+    let all=tierCards(tier);if(luck&&all.some(isJump)){const f=all.filter(c=>!isJump(c));if(f.length)all=f;}
+    used[tier]=used[tier]||shuffle(all.map((_,i)=>i));
+    // Sprung nach vorne: nur für die letzten 3 der Tabelle, bei genug Rückstand; Letzter mit den meisten Feldern
+    const pos=st.indexOf(r),fromBottom=st.length-1-pos,ahead=pos>0?st[pos-1]:null,gap=ahead?ahead.total-r.total:0;
+    const copies=luck&&fromBottom<3&&ahead&&gap>=jumpGap()?W[fromBottom]:0;
+    const normal=all.map((_,i)=>i);
+    let cards=normal.map(i=>all[i]),idx,eff=null;
+    const hitJump=copies>0&&Math.random()*(normal.length+copies)<copies;
+    if(!hitJump){let pi=used[tier].find(i=>normal.includes(i));
+      if(pi===undefined)pi=normal[Math.floor(Math.random()*normal.length)];else used[tier].splice(used[tier].indexOf(pi),1);
+      idx=pi;eff=luck?parseEff(all[pi]):null;}
+    if(copies>0){// Sprung-Felder gleichmäßig zwischen die übrigen Karten setzen
+      const n=cards.length+copies,mixed=[];let k=0;
+      for(let x=0;x<n;x++){const wantJ=Math.floor((x+1)*copies/n)>Math.floor(x*copies/n);mixed.push(wantJ?{c:JUMP_CARD,j:true}:{c:cards[k],src:k++});}
+      const jpos=mixed.map((m,x)=>m.j?x:-1).filter(x=>x>=0);
+      if(hitJump){idx=jpos[Math.floor(Math.random()*jpos.length)];eff={t:'jump',v:gap+1,to:ahead.id};}
+      else idx=mixed.findIndex(m=>m.src===idx);
+      cards=mixed.map(m=>m.c);}
     if(eff&&eff.t==='steal')eff.from=leader.id;
-    if(eff&&eff.t==='jump'){eff.v=gap+1;eff.to=ahead.id;}
     const o={id:r.id,name:r.name,tier,cards,idx,j:+(Math.random()*2-1).toFixed(3)};if(eff)o.eff=eff;return o;};
   // Handicaps für die Top 3, dann Glück von Platz 4 abwärts
   const spins=[...top.map((r,i)=>pick(r,['schwer','mittel','leicht'][i])),...rest.map((r,i)=>pick(r,lt[i]))];
