@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Musterseite Design</title>
+<style>
+/* Musterseite für das neue Design. Steht für sich, nutzt keine App-Daten. */
+@font-face{font-family:"Nunito";src:url(fonts/nunito.woff2) format("woff2");font-weight:200 1000;font-style:normal;font-display:swap}
+@font-face{font-family:"Nunito";src:url(fonts/nunito-italic.woff2) format("woff2");font-weight:200 1000;font-style:italic;font-display:swap}
+
+:root{
+  --font:"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --bg:#EDF1F7; --surface:#FFFFFF; --surface-2:#F3F5FA; --line:#DEE3EC;
+  --ink:#151A2C; --muted:#5B6479; --faint:#8790A6; --edge:#151A2C;
+  --accent:#FFC72C; --on-accent:#221A02;
+  --good:#16884A; --good-bg:#E2F4E9; --bad:#CF3229; --bad-bg:#FBE6E4;
+  --curb:#E8352E; --k1:#2F86E0; --k2:#E8352E;
+  --shadow:0 1px 2px rgba(21,26,44,.06),0 6px 20px rgba(21,26,44,.06);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0C1121; --surface:#151B30; --surface-2:#1C2440; --line:#273050;
+  --ink:#EEF1F8; --muted:#A1AAC3; --faint:#6F7997; --edge:#070A14;
+  --good:#45D488; --good-bg:rgba(69,212,136,.13); --bad:#FF6B61; --bad-bg:rgba(255,107,97,.13);
+  --k1:#58A8F5; --k2:#FF5E57;
+  --shadow:0 10px 30px rgba(0,0,0,.28);
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0C1121; --surface:#151B30; --surface-2:#1C2440; --line:#273050;
+  --ink:#EEF1F8; --muted:#A1AAC3; --faint:#6F7997; --edge:#070A14;
+  --good:#45D488; --good-bg:rgba(69,212,136,.13); --bad:#FF6B61; --bad-bg:rgba(255,107,97,.13);
+  --k1:#58A8F5; --k2:#FF5E57;
+  --shadow:0 10px 30px rgba(0,0,0,.28);
+  color-scheme:dark;}
+
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+.curb{height:10px;background:repeating-linear-gradient(90deg,var(--curb) 0 28px,#fff 28px 56px)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* Leiste der Musterseite */
+.mbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:16px 0 4px}
+.mbar p{margin:0;color:var(--muted);font-weight:600;max-width:640px}
+.mbar b{color:var(--ink)}
+.seg{display:inline-flex;gap:2px;padding:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px}
+.seg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+.seg button{font:700 15px var(--font);color:var(--muted);background:transparent;border:0;border-radius:999px;padding:7px 16px;cursor:pointer;white-space:nowrap;flex:none}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"],.seg button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.lbl{display:block;margin:34px 0 10px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+
+/* Logo: bleibt der eine laute Schriftzug */
+.logo{font:italic 900 clamp(34px,6vw,58px)/1 var(--font);letter-spacing:-.01em;margin:0;color:#fff;
+  -webkit-text-stroke:2px var(--edge);paint-order:stroke fill;text-shadow:3px 3px 0 var(--curb),5px 5px 0 var(--edge)}
+
+/* Bearbeiten-Ansicht */
+.app{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:hidden}
+.apphead{padding:22px 24px 18px;border-bottom:1px solid var(--line)}
+.apphead .sub{margin:8px 0 16px;color:var(--muted);font-weight:600}
+.navrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.navrow .spacer{flex:1}
+.btn{font:800 15px var(--font);border:0;border-radius:12px;padding:10px 16px;cursor:pointer;background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+.btn.primary{background:var(--curb);color:#fff;border-color:transparent;box-shadow:0 3px 0 color-mix(in srgb,var(--curb) 60%,#000)}
+.appbody{padding:22px 24px 26px}
+h2{font:900 26px/1.2 var(--font);margin:0 0 16px;letter-spacing:-.01em}
+
+/* Tabelle */
+.scroll{overflow-x:auto;margin:0 -8px;padding:0 8px}
+table{width:100%;border-collapse:collapse;min-width:520px}
+th{font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);text-align:left;padding:0 12px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:not(.cut):hover td{background:var(--surface-2)}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.place{width:64px;padding-top:14px}
+td.name{font-weight:800;font-size:17px}
+td.r{color:var(--muted);font-weight:700}
+td.total{font-weight:900;font-size:22px;letter-spacing:-.01em}
+.bx{font-size:12px;font-weight:800;color:var(--good);margin-left:5px;white-space:nowrap}
+.bx.minus{color:var(--bad)}
+.tag{display:inline-block;font-size:12px;font-weight:800;line-height:1;padding:5px 9px;border-radius:999px;margin-left:10px;vertical-align:3px}
+.tag.bad{color:var(--bad);background:var(--bad-bg)}
+.tag.good{color:var(--good);background:var(--good-bg)}
+.mini{font:800 12px var(--font);margin-left:6px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;vertical-align:2px}
+.legend{margin:14px 0 0;color:var(--muted);font-size:14px}
+
+/* Medaillen: Metallscheibe mit Band. Ab Platz 4 nur die Zahl. */
+.medal{--m1:#FFF4C4;--m2:#F2BD2C;--m3:#B07B08;--rb:var(--curb);
+  position:relative;isolation:isolate;display:inline-grid;place-items:center;width:34px;height:34px;
+  font:900 15px/1 var(--font);color:#3A2A00;font-variant-numeric:tabular-nums}
+.medal::before{content:"";position:absolute;z-index:0;left:50%;bottom:calc(100% - 6px);transform:translateX(-50%);width:22px;height:14px;
+  background:linear-gradient(90deg,var(--rb) 0 36%,#fff 36% 64%,var(--rb) 64%);clip-path:polygon(0 0,100% 0,74% 100%,26% 100%)}
+.medal::after{content:"";position:absolute;inset:0;z-index:1;border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,var(--m1) 0 16%,var(--m2) 58%,var(--m3) 100%);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.4),inset 0 -3px 0 rgba(0,0,0,.14),0 1px 2px rgba(0,0,0,.3)}
+.medal b{position:relative;z-index:2;text-shadow:0 1px 0 rgba(255,255,255,.45)}
+.medal.m2{--m1:#FFFFFF;--m2:#C9D0DC;--m3:#7F8A9E;color:#252B38}
+.medal.m3{--m1:#FBD6B6;--m2:#CF864A;--m3:#8A4E20;color:#3B1D06}
+.pn{display:inline-grid;place-items:center;width:34px;height:34px;font-weight:800;color:var(--faint);font-variant-numeric:tabular-nums}
+
+/* Ziellinie zwischen Finale und Spaßfinale */
+tr.cut td{padding:6px 0;border:0;background:none}
+.finish{position:relative;height:10px;border-radius:2px;
+  background:conic-gradient(var(--ink) 25%,var(--surface) 0 50%,var(--ink) 0 75%,var(--surface) 0) 0 0/10px 10px}
+.finish span{position:absolute;top:50%;transform:translateY(-50%);background:var(--surface);padding:0 10px;font-size:12px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:var(--ink)}
+.finish .up{left:16px} .finish .down{right:16px;color:var(--faint)}
+
+/* Beamer */
+.beamer{background:var(--bg);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:0 clamp(16px,3vw,40px) 34px;font-size:20px;overflow:hidden}
+.dhead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:24px 0 14px}
+.dright{display:flex;align-items:center;gap:12px;white-space:nowrap}
+.counter{font:italic 900 22px/1 var(--font);background:var(--accent);color:var(--on-accent);border-radius:999px;padding:9px 18px}
+.dbtn{font:800 16px var(--font);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:8px 16px}
+.lights{display:flex;gap:9px;background:#0A0D18;padding:8px 11px;border-radius:999px}
+.lights i{width:18px;height:18px;border-radius:50%;background:#2E3346;display:block}
+.lights i.on{background:#3FD27F;box-shadow:0 0 10px #3FD27F}
+.checker{height:12px;margin:0 calc(-1 * clamp(16px,3vw,40px));background:conic-gradient(var(--edge) 25%,#fff 0 50%,var(--edge) 0 75%,#fff 0) 0 0/12px 12px}
+.dtitle{font:900 clamp(28px,3vw,44px)/1.15 var(--font);letter-spacing:-.01em;margin:24px 0 18px}
+.dtitle small{display:block;font-size:.45em;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.bline{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 18px;margin-bottom:18px;font-size:18px}
+.bline .t{color:var(--muted);font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 14px;font-weight:800}
+.chip em{font-style:normal;color:var(--on-accent);background:var(--accent);border-radius:999px;padding:0 8px;font-size:.85em}
+.groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:18px}
+.group{background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--k1);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+.group.c2{border-top-color:var(--k2)}
+.gh{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 22px 12px;border-bottom:1px solid var(--line)}
+.gh h3{margin:0;font:900 28px/1.1 var(--font);letter-spacing:-.01em}
+.gh .meta{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-weight:700;font-size:16px;white-space:nowrap}
+.gh .meta::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--k1)}
+.group.c2 .gh .meta::before{background:var(--k2)}
+.prow{padding:14px 22px 16px}
+.prow+.prow{border-top:1px solid var(--line)}
+.pname{display:flex;align-items:center;gap:10px;font-size:28px;font-weight:800;line-height:1.2}
+.carrier{font-size:15px;font-weight:900;background:var(--accent);color:var(--on-accent);border-radius:999px;padding:3px 11px}
+.effect{display:flex;gap:10px;align-items:baseline;margin-top:6px;font-size:18px;font-weight:600;color:var(--muted);line-height:1.35}
+.effect .em{flex:none;font-size:20px}
+.effect.luck{color:var(--good)}
+.effect .val{flex:none;margin-left:auto;font-size:15px;font-weight:900;background:var(--good-bg);color:var(--good);border-radius:999px;padding:2px 10px}
+.progress{height:4px;background:var(--line);border-radius:999px;overflow:hidden;margin-top:24px}
+.progress i{display:block;height:100%;width:34%;background:var(--curb)}
+.foot{margin:30px 0 50px;color:var(--faint);font-size:14px}
+
+@media (max-width:640px){
+  .apphead,.appbody{padding-left:16px;padding-right:16px}
+  .pname{font-size:23px}
+  .gh h3{font-size:23px}
+}
+</style>
+</head>
+<body>
+<div class="curb" aria-hidden="true"></div>
+<div class="wrap">
+
+  <div class="mbar">
+    <p><b>Musterseite für das neue Design.</b> Die echte App bleibt unverändert. Zwischen hell und dunkel umschalten und vergleichen.</p>
+    <div class="seg" role="group" aria-label="Hell oder dunkel">
+      <button type="button" data-th="">System</button>
+      <button type="button" data-th="light">Hell</button>
+      <button type="button" data-th="dark">Dunkel</button>
+    </div>
+  </div>
+
+  <span class="lbl">Bearbeiten · Tabelle</span>
+  <div class="app">
+    <div class="apphead">
+      <h1 class="logo">Mario Kart Turnier</h1>
+      <p class="sub">8 Teilnehmer · 2 Konsolen · 3 Liga-Runden</p>
+      <div class="navrow">
+        <div class="seg" role="tablist" aria-label="Bereiche">
+          <button role="tab" aria-selected="false">Teilnehmer</button>
+          <button role="tab" aria-selected="false">Liga</button>
+          <button role="tab" aria-selected="true">Tabelle</button>
+          <button role="tab" aria-selected="false">Turnierbaum</button>
+          <button role="tab" aria-selected="false">Ruhmeshalle</button>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn primary" type="button">Anzeige öffnen</button>
+      </div>
+    </div>
+    <div class="appbody">
+      <h2>Tabelle</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Platz</th><th>Name</th><th class="num">R1</th><th class="num">R2</th><th class="num">R3</th><th class="num">Gesamt</th></tr></thead>
+        <tbody>
+          <tr><td class="place"><span class="medal"><b>1</b></span></td><td class="name">Flo</td><td class="num r">60</td><td class="num r">38</td><td class="num r">–</td><td class="num total">98</td></tr>
+          <tr><td class="place"><span class="medal m2"><b>2</b></span></td><td class="name">Marius<span class="tag bad">Stechen</span><button class="mini" type="button">hat gewonnen</button></td><td class="num r">45</td><td class="num r">41<span class="bx">+6 💰</span></td><td class="num r">–</td><td class="num total">92</td></tr>
+          <tr><td class="place"><span class="medal m3"><b>3</b></span></td><td class="name">martin<span class="tag bad">Stechen</span><button class="mini" type="button">hat gewonnen</button></td><td class="num r">45</td><td class="num r">47</td><td class="num r">–</td><td class="num total">92</td></tr>
+          <tr><td class="place"><span class="pn">4</span></td><td class="name">jessi</td><td class="num r">43</td><td class="num r">36<span class="bx">+3 🍀</span></td><td class="num r">–</td><td class="num total">82</td></tr>
+          <tr class="cut" aria-hidden="true"><td colspan="6"><div class="finish"><span class="up">▲ Finale</span><span class="down">Spaßfinale ▼</span></div></td></tr>
+          <tr><td class="place"><span class="pn">5</span></td><td class="name">Berni</td><td class="num r">23</td><td class="num r">35<span class="bx">+17 🍀</span></td><td class="num r">–</td><td class="num total">75</td></tr>
+          <tr><td class="place"><span class="pn">6</span></td><td class="name">chris</td><td class="num r">32</td><td class="num r">39</td><td class="num r">–</td><td class="num total">71</td></tr>
+          <tr><td class="place"><span class="pn">7</span></td><td class="name">Anna</td><td class="num r">35</td><td class="num r">33<span class="bx minus">−8 🦝</span></td><td class="num r">–</td><td class="num total">60</td></tr>
+          <tr><td class="place"><span class="pn">8</span></td><td class="name">Tobi</td><td class="num r">28</td><td class="num r">30</td><td class="num r">–</td><td class="num total">58</td></tr>
+        </tbody>
+      </table></div>
+      <p class="legend">Hinter den Rundenpunkten: 💰 Kopfgeld, 🍀 Glücksrad, 🦝 Punkteklau. Bei Gleichstand zählt das beste Einzelergebnis, danach ein Stechen-Rennen.</p>
+    </div>
+  </div>
+
+  <span class="lbl">Beamer · Jetzt am Start</span>
+  <div class="beamer">
+    <div class="dhead">
+      <h1 class="logo">Mario Kart Turnier</h1>
+      <div class="dright">
+        <span class="counter">Runde 2/3</span>
+        <span class="dbtn">❚❚ Pause</span>
+        <div class="lights" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+    <div class="checker" aria-hidden="true"></div>
+    <h2 class="dtitle"><small>Jetzt am Start</small>Runde 2</h2>
+    <div class="bline">💰 <b>Kopfgeld</b> <span class="t">Schlag den Träger deiner Gruppe. Bis 5 Punkte dahinter gibt’s die Hälfte.</span>
+      <span class="chip">Marius <em>+6</em></span><span class="chip">Flo <em>+9</em></span></div>
+    <div class="groups">
+      <article class="group">
+        <div class="gh"><h3>Gruppe 1</h3><span class="meta">Konsole 1 · Durchgang 1</span></div>
+        <div class="prow"><div class="pname">chris</div>
+          <div class="effect luck"><span class="em">🎒</span><span>Du legst die Item-Einstellung für deine Gruppe fest</span></div></div>
+        <div class="prow"><div class="pname">Marius <span class="carrier">💰 +6</span></div>
+          <div class="effect"><span class="em">📉</span><span>Der Tabellenletzte stellt dein Fahrzeug zusammen</span></div></div>
+        <div class="prow"><div class="pname">jessi</div>
+          <div class="effect luck"><span class="em">🎁</span><span>+3 Punkte geschenkt</span><span class="val">+3</span></div></div>
+      </article>
+      <article class="group c2">
+        <div class="gh"><h3>Gruppe 2</h3><span class="meta">Konsole 2 · Durchgang 1</span></div>
+        <div class="prow"><div class="pname">martin</div>
+          <div class="effect"><span class="em">🎲</span><span>Fahrer und Fahrzeug per Zufallsauswahl im Menü</span></div></div>
+        <div class="prow"><div class="pname">Berni</div>
+          <div class="effect luck"><span class="em">🔥</span><span>Punkte ×1,5 in dieser Runde</span><span class="val">×1,5</span></div></div>
+        <div class="prow"><div class="pname">Flo <span class="carrier">💰 +9</span></div>
+          <div class="effect"><span class="em">🪶</span><span>Leichtester Fahrer auf Bike mit den kleinsten Reifen</span></div></div>
+      </article>
+    </div>
+    <div class="progress" aria-hidden="true"><i></i></div>
+  </div>
+
+  <p class="foot">Schrift: Nunito (lokal in <code>fonts/</code>, SIL Open Font License). Glücksrad, Ampel, Turnierbaum und Konfetti bleiben wie sie sind.</p>
+</div>
+<script>
+(function(){
+  var root=document.documentElement,btns=document.querySelectorAll('[data-th]');
+  function set(v){
+    if(v)root.setAttribute('data-theme',v);else root.removeAttribute('data-theme');
+    btns.forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.th===v));});
+    try{localStorage.setItem('mk-muster-theme',v);}catch(e){}
+  }
+  var saved='';try{saved=localStorage.getItem('mk-muster-theme')||'';}catch(e){}
+  btns.forEach(function(b){b.addEventListener('click',function(){set(b.dataset.th);});});
+  set(saved);
+})();
+</script>
+</body>
+</html>
