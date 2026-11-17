@@ -2,17 +2,11 @@
 
 Erledigte Aufgaben abhaken (`[x]`) und kurz notieren, was umgesetzt wurde. Die Regeln aus `CLAUDE.md` gelten für alles hier.
 
-Alle drei Aufgaben erst **nach dem Turnier**, in dieser Reihenfolge.
+Die beiden offenen Aufgaben erst **nach dem Turnier**, in dieser Reihenfolge.
 
-## [ ] Design-Schritte von `testdaten` nach `main` bringen
+## [x] Design-Schritte von `testdaten` nach `main` bringen
 
-Erst wenn der Nutzer sie freigibt. Auf `testdaten` fertig und getestet, auf `main` fehlen noch:
-- `13ce435` Einstellungen mit Steppern, Segmenten und Schalter
-- `d5b81e0` Hell/Dunkel-Schalter in der Kopfzeile (System/Hell/Dunkel, `localStorage` `mk-theme`)
-- `c088b2c` Karteneditor fürs Glücksrad
-- der Commit, der diese Aufgabenliste ergänzt hat (`AUFGABEN.md`)
-
-Per Cherry-Pick nach `main` holen, nicht `testdaten` mergen (sonst kommen `testdaten.html`, `muster.html` und die befüllte `ruhmeshalle.json` mit). `fonts/` ist schon auf `main`. Danach `main` wieder in `testdaten` mergen.
+Vom Nutzer nach eigener Prüfung in der Preview vorgezogen und noch vor dem Turnier freigegeben. Per Cherry-Pick nach `main` gebracht (Einstellungen mit Steppern, Hell/Dunkel-Schalter, Karteneditor, diese Aufgabenliste), danach `main` in `testdaten` gemergt. Die App-Dateien auf beiden Branches sind identisch.
 
 ## [ ] Eine HTML-Datei statt drei
 
