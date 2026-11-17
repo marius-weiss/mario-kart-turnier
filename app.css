@@ -91,6 +91,41 @@ details summary{cursor:pointer;font-weight:800;margin-top:14px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
 .stats div{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:12px 16px;color:var(--muted);font-weight:600}
 .stats b{display:block;font:900 26px/1.2 var(--font);color:var(--ink)}
+
+/* Einstellungen: Gruppen mit Zeilen, Beschriftung links, Steuerelement rechts */
+.settings h2{margin-bottom:6px}
+.sgroup{border-top:1px solid var(--line);padding:18px 0 6px}
+.sgroup:first-of-type{border-top:0;padding-top:4px}
+.sgroup>h3{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 4px}
+.sgroup details summary{margin-top:6px}
+.srow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 24px;padding:10px 0}
+.srow+.srow{border-top:1px solid color-mix(in srgb,var(--line) 55%,transparent)}
+.slabel{flex:1 1 260px;min-width:0}
+.slabel b{display:block;font-weight:800}
+.slabel small{display:block;color:var(--muted);font-size:14px;font-weight:600;line-height:1.4;margin-top:1px}
+.sctrl{flex:none;max-width:100%}
+.srow.off .slabel{opacity:.5}
+.seg{display:inline-flex;gap:2px;padding:3px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px}
+.seg button{font:800 16px var(--font);min-width:48px;padding:7px 14px;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer;font-variant-numeric:tabular-nums}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line),0 1px 3px rgba(0,0,0,.14)}
+.stepper{display:inline-flex;align-items:center}
+.stepper .sb{width:42px;height:42px;display:grid;place-items:center;font:800 22px/1 var(--font);color:var(--ink);background:var(--surface);border:1px solid var(--line);cursor:pointer;padding:0}
+.stepper .sb:first-child{border-radius:12px 0 0 12px}
+.stepper .sb:nth-child(3){border-radius:0 12px 12px 0}
+.stepper .sb:hover:not(:disabled){background:var(--surface-2)}
+.stepper .sb:disabled{color:var(--faint);opacity:.5;cursor:not-allowed}
+.stepper input[type=number]{width:60px;height:42px;padding:0 4px;text-align:center;border-radius:0;border-left:0;border-right:0;font-size:17px}
+.stepper .unit{width:52px;margin-left:10px;color:var(--muted);font-weight:700;font-size:14px}
+.switch{position:relative;display:inline-block;width:52px;height:30px;vertical-align:middle}
+.switch input[type=checkbox]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:1}
+.switch span{position:absolute;inset:0;border-radius:999px;background:color-mix(in srgb,var(--faint) 55%,var(--surface));transition:background .15s}
+.switch span::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.switch input:checked+span{background:var(--good)}
+.switch input:checked+span::after{transform:translateX(22px)}
+.switch input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+@media (max-width:520px){.srow{gap:8px}.sctrl{width:100%}.stepper .unit{width:auto}
+  .srow:has(.switch){flex-wrap:nowrap}.srow:has(.switch) .slabel{flex-basis:auto}.srow:has(.switch) .sctrl{width:auto}}
 .roundbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .pill{font:700 15px var(--font);border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:7px 16px;border-radius:999px;cursor:pointer}
 .pill[aria-pressed="true"]{background:var(--accent);border-color:transparent;color:var(--on-accent)}
