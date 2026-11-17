@@ -77,12 +77,15 @@ function parseEff(text){
   if((m=t.match(/\+\s*(\d+)\s*(?:Bonus)?punkt/i)))return{t:'plus',v:+m[1]};
   return null;
 }
-function cardPreview(text,tier){
-  const luck=isLuckTier(tier);
-  return String(text).split('\n').map(x=>x.trim()).filter(Boolean).map(c=>{
-    const e=luck?parseEff(c):null,sc=splitCard(c);
-    const what=!luck?'Handicap, keine Punkte':!e?'Spielregel, keine Punkte':e.t==='mult'?`Rundenpunkte ×${fmtNum(e.v)}${e.v>=5?' (Maximum)':''}`:e.t==='plus'?`+${e.v} Punkte`:e.t==='steal'?`${e.v} Punkte vom Tabellenführer`:'Sprung wird gesondert vergeben, Zeile wird ignoriert';
-    return`<span class="cp${e?' on':''}">${esc(sc.em||'•')} ${esc(what)}</span>`;}).join('');
+/* Was die App aus einem Kartentext liest (Karteneditor) */
+function cardWhat(c,tier){
+  const e=isLuckTier(tier)?parseEff(c):null;
+  return!isLuckTier(tier)?'Handicap, keine Punkte':!e?'Spielregel, keine Punkte':e.t==='mult'?`Rundenpunkte ×${fmtNum(e.v)}${e.v>=5?' (Maximum)':''}`:e.t==='plus'?`+${e.v} Punkte`:e.t==='steal'?`${e.v} Punkte vom Tabellenführer`:'Sprung wird gesondert vergeben, Karte wird ignoriert';
+}
+function cardTag(c,tier){
+  if(!isLuckTier(tier))return'';const e=parseEff(c);
+  const t=!e?'Regel':e.t==='mult'?'×'+fmtNum(e.v):e.t==='plus'?'+'+e.v:e.t==='steal'?'klaut '+e.v:'ignoriert';
+  return`<span class="ctag${e&&e.t!=='jump'?' on':''}" title="${esc(cardWhat(c,tier))}">${esc(t)}</span>`;
 }
 const effShort=e=>!e?'':e.t==='mult'?'×'+fmtNum(e.v):e.t==='plus'?'+'+e.v:'−'+e.v;
 function luckBonus(ri,id){
@@ -238,6 +241,54 @@ const srow=(label,hint,ctrl,off)=>`<div class="srow${off?' off':''}"><div class=
 const seg=(key,label,vals,cur)=>`<div class="seg" role="radiogroup" aria-label="${label}">${vals.map(v=>`<button type="button" role="radio" data-set="${key}" data-v="${v}" data-key="seg-${key}-${v}" aria-checked="${+cur===v}">${v}</button>`).join('')}</div>`;
 /* Zahl mit − und + statt Pfeiltasten im Feld */
 const stepper=(id,v,min,max,unit,label,dis,attrs)=>`<div class="stepper"><button type="button" class="sb" data-d="-1" data-key="sb-${id}-" aria-label="${label} verringern" ${dis||v<=min?'disabled':''}>−</button><input type="number" ${attrs||`id="${id}"`} data-key="in-${id}" min="${min}" max="${max}" inputmode="numeric" value="${v}" aria-label="${label}" ${dis?'disabled':''}><button type="button" class="sb" data-d="1" data-key="sb-${id}+" aria-label="${label} erhöhen" ${dis||v>=max?'disabled':''}>+</button>${unit?`<span class="unit">${unit}</span>`:''}</div>`;
+/* ---------- Karteneditor fürs Glücksrad: ein Rad zur Zeit, je Karte eine Zeile ----------
+   Gespeichert wird wie bisher S.cardTiers = {stufe:['🎁 Kartentext', …]}; fehlende Stufen nehmen die Standardkarten */
+let cardTier='schwer',cardEdit=-1;
+const joinCard=(em,tx)=>{em=String(em||'').replace(/\s+/g,'');tx=String(tx||'').trim().replace(/\s+/g,' ');return tx?(em?em+' '+tx:tx):'';};
+const sameAsDefault=(k,l)=>l.join('\n')===DEFAULT_TIERS[k].join('\n');
+const isCustomTier=k=>!sameAsDefault(k,tierCards(k));
+function saveTier(k,list){
+  const t=Object.assign({},S.cardTiers||{});
+  if(list&&!sameAsDefault(k,list))t[k]=list;else delete t[k];
+  if(Object.keys(t).length)S.cardTiers=t;else delete S.cardTiers;
+  persist();render();
+}
+function cardEditor(){
+  if(!TIERS.some(t=>t[0]===cardTier))cardTier='schwer';
+  const k=cardTier,[,label,desc]=TIERS.find(t=>t[0]===k),luck=isLuckTier(k),cards=tierCards(k),n=cards.length,custom=isCustomTier(k);
+  const tab=([t,l])=>`<button type="button" role="tab" data-ctier="${t}" data-key="ct-${t}" aria-selected="${t===k}">${esc(l.replace(/^(Handicap|Glück) /,''))}<span class="cn">${tierCards(t).length}</span></button>`;
+  const row=(c,i)=>{const sc=splitCard(c);
+    if(i===cardEdit)return`<li class="crow edit"><input type="text" class="cem-in" data-cf="em" data-key="cee" value="${esc(sc.em)}" aria-label="Emoji" maxlength="8"><input type="text" class="ctx-in" data-cf="tx" data-key="cet" value="${esc(sc.text)}" aria-label="Kartentext"><button type="button" class="btn go" data-csave>Speichern</button><button type="button" class="btn ghost" data-ccancel>Abbrechen</button><div class="chint" data-chint>${esc(cardWhat(c,k))}</div></li>`;
+    return`<li class="crow"><span class="cem" aria-hidden="true">${esc(sc.em||'•')}</span><div class="cbody"><span class="ctx">${esc(sc.text)}</span>${cardTag(c,k)}</div><button type="button" class="cbtn" data-cedit="${i}" data-key="ced-${k}-${i}" aria-label="Karte bearbeiten: ${esc(sc.text)}" title="Bearbeiten">✎</button><button type="button" class="cbtn del" data-cdel="${i}" data-key="cdl-${k}-${i}" aria-label="Karte löschen: ${esc(sc.text)}" title="${n<=2?'Mindestens 2 Karten je Rad':'Löschen'}" ${n<=2?'disabled':''}>×</button></li>`;};
+  return`<div class="ctabs">
+      <div class="cgrp"><span>Handicap</span><div class="seg" role="tablist" aria-label="Handicap-Räder">${TIERS.filter(t=>!isLuckTier(t[0])).map(tab).join('')}</div></div>
+      <div class="cgrp"><span>Glück</span><div class="seg" role="tablist" aria-label="Glücks-Räder">${TIERS.filter(t=>isLuckTier(t[0])).map(tab).join('')}</div></div></div>
+    <p class="note chead"><b>${esc(label)}</b> · ${esc(desc)}${custom?' · <span class="cmod">angepasst</span>':''}</p>
+    <ul class="clist" aria-label="Karten ${esc(label)}">${cards.map(row).join('')}</ul>
+    <div class="cadd"><input type="text" class="cem-in" id="cardNewEm" data-key="cne" placeholder="🎁" aria-label="Emoji für die neue Karte" maxlength="8"><input type="text" class="ctx-in" id="cardNewTx" data-key="cnt" placeholder="${luck?'z. B. +5 Punkte geschenkt':'z. B. Nur Bike, kein Kart'}" aria-label="Text der neuen Karte"><button type="button" class="btn" id="cardAdd" data-key="cadd">Karte hinzufügen</button></div>
+    <div class="chint" id="cardNewHint">${luck?'„×2“ multipliziert die Rundenpunkte (höchstens ×5), „+5 Punkte“ schenkt Punkte, „klaust 4“ nimmt sie dem Tabellenführer. Alles andere ist eine Spielregel ohne Punkte.':'Handicaps sind Spielregeln, Punkte gibt es dafür nicht.'}</div>
+    <div class="row cfoot"><p class="note">Das Emoji erscheint auf dem Rad. Doppelte Karten kommen öfter. Bereits gedrehte Ergebnisse bleiben, wie sie gezogen wurden.</p>${custom?`<button type="button" class="btn ghost" id="cardsDef">Standardkarten für dieses Rad</button>`:''}</div>`;
+}
+function wireCardEditor(){
+  const T=$('teilnehmer'),k=cardTier,cards=()=>tierCards(k).slice();
+  const focusEdit=i=>{const b=T.querySelector(`[data-cedit="${i}"]`);if(b)b.focus();};
+  T.querySelectorAll('[data-ctier]').forEach(b=>b.onclick=()=>{cardTier=b.dataset.ctier;cardEdit=-1;render();});
+  T.querySelectorAll('[data-cedit]').forEach(b=>b.onclick=()=>{cardEdit=+b.dataset.cedit;render();const t=T.querySelector('[data-cf="tx"]');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length);}});
+  T.querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>{const l=cards();if(l.length<=2)return;l.splice(+b.dataset.cdel,1);cardEdit=-1;saveTier(k,l);});
+  const ed=T.querySelector('.crow.edit');
+  if(ed){const em=ed.querySelector('[data-cf="em"]'),tx=ed.querySelector('[data-cf="tx"]'),hint=ed.querySelector('[data-chint]'),i=cardEdit;
+    const save=()=>{const c=joinCard(em.value,tx.value);if(!c){tx.focus();return;}const l=cards();l[i]=c;cardEdit=-1;saveTier(k,l);focusEdit(i);};
+    const cancel=()=>{cardEdit=-1;render();focusEdit(i);};
+    em.oninput=tx.oninput=()=>{hint.textContent=cardWhat(joinCard(em.value,tx.value),k);};
+    [em,tx].forEach(x=>x.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();save();}else if(e.key==='Escape'){e.preventDefault();cancel();}});
+    ed.querySelector('[data-csave]').onclick=save;ed.querySelector('[data-ccancel]').onclick=cancel;}
+  const nem=$('cardNewEm'),ntx=$('cardNewTx'),nh=$('cardNewHint'),def=nh.textContent;
+  const add=()=>{const c=joinCard(nem.value,ntx.value);if(!c){ntx.focus();return;}const l=cards();l.push(c);saveTier(k,l);$('cardNewTx').focus();};
+  nem.oninput=ntx.oninput=()=>{const c=joinCard(nem.value,ntx.value),e=c&&isLuckTier(k)?parseEff(c):null;nh.textContent=c?'Erkannt: '+cardWhat(c,k):def;nh.classList.toggle('on',!!(e&&e.t!=='jump'));};
+  [nem,ntx].forEach(x=>x.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();add();}});
+  $('cardAdd').onclick=add;
+  const d=$('cardsDef');if(d)d.onclick=()=>{if(!confirm('Die eigenen Karten dieses Rads durch die Standardkarten ersetzen?'))return;cardEdit=-1;saveTier(k,null);};
+}
 function renderTeilnehmer(){
   const n=S.players.length,plan=planFor(n),e=estimate(n),started=S.roundsData.length>0,bOn=S.bountyOn!==false;
   $('teilnehmer').innerHTML=`
@@ -274,11 +325,7 @@ function renderTeilnehmer(){
       ${['Letzter','Vorletzter','Drittletzter'].map((l,i)=>srow(`Felder für ${l}`,i?'':'Mehr Felder heißt höhere Chance',stepper(`jw${i}`,jumpW()[i],0,10,'Felder',`Sprung-Felder ${l}`,false,`class="jw" data-i="${i}"`))).join('')}
       <p class="note">Nur die letzten 3 der Tabelle können springen. Wer den Sprung zieht, landet 1 Punkt vor seinem Vordermann.</p>
     </div>
-    <div class="sgroup"><h3>🎡 Glücksrad</h3>
-    <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile, mindestens 2 je Rad. Ein Emoji am Anfang erscheint auf dem Rad. Die Punkte rechnet die App selbst aus dem Kartentext aus (nur bei den Glücks-Rädern): „×3“ multipliziert die Rundenpunkte (höchstens ×5), „+5 Punkte“ schenkt Punkte, „klaust 4“ nimmt sie dem Tabellenführer weg. Alles andere ist eine Spielregel ohne Punkte. Die Vorschau unter jedem Feld zeigt, was erkannt wird. Bereits gedrehte Ergebnisse bleiben, wie sie gezogen wurden.</p>
-      ${TIERS.map(([k,l,d])=>`<h3 style="margin:14px 0 4px">${esc(l)}</h3><p class="note" style="margin:0 0 6px">${esc(d)}</p><textarea data-tier="${k}" aria-label="Karten ${esc(l)}" style="min-height:120px">${esc(tierCards(k).join('\n'))}</textarea><div class="cprev" data-prev="${k}">${cardPreview(tierCards(k).join('\n'),k)}</div>`).join('')}
-      <div class="row" style="margin-top:8px"><button class="btn" id="cardsSave">Karten speichern</button><button class="btn ghost" id="cardsDef">Standardkarten</button></div></details>
-    </div>
+    <div class="sgroup"><h3>🎡 Glücksrad-Karten</h3>${cardEditor()}</div>
     <div class="sgroup"><h3>Kopfbild</h3>
       ${srow('Eigenes Bild','Erscheint oben neben dem Titel, auch auf dem Beamer',`<div class="row">
         <label class="btn ghost" style="display:inline-block">${S.logo?'Bild ersetzen':'Bild hochladen'}<input type="file" id="logoFile" accept="image/*" hidden></label>
@@ -314,12 +361,7 @@ function renderTeilnehmer(){
   $('teilnehmer').querySelectorAll('.jw').forEach(inp=>inp.onchange=()=>{const v=Math.round(+inp.value);
     if(!(v>=0&&v<=10)){alert('Bitte 0 bis 10 Felder eintragen.');inp.value=jumpW()[+inp.dataset.i];return;}
     const w=jumpW();w[+inp.dataset.i]=v;S.jumpW=w;persist();render();});
-  $('teilnehmer').querySelectorAll('textarea[data-tier]').forEach(ta=>ta.oninput=()=>{const pv=$('teilnehmer').querySelector(`[data-prev="${ta.dataset.tier}"]`);if(pv)pv.innerHTML=cardPreview(ta.value,ta.dataset.tier);});
-  $('cardsSave').onclick=()=>{const t={};
-    for(const ta of $('teilnehmer').querySelectorAll('textarea[data-tier]')){const l=ta.value.split('\n').map(x=>x.trim()).filter(Boolean);
-      if(l.length<2){alert(`Bitte bei „${TIERS.find(x=>x[0]===ta.dataset.tier)[1]}“ mindestens 2 Karten eintragen.`);return;}t[ta.dataset.tier]=l;}
-    S.cardTiers=t;persist();render();};
-  $('cardsDef').onclick=()=>{delete S.cardTiers;persist();render();};
+  wireCardEditor();
   $('resetBtn').onclick=()=>{if(confirm('Wirklich alles löschen? Teilnehmer und Ergebnisse gehen verloren.')){S=DEF();ligaView=0;persist();render();}};
 }
 function renderLiga(){
