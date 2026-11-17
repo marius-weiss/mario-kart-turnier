@@ -213,6 +213,10 @@ body.display .btag{font-size:16px}
 .bnote{background:color-mix(in srgb,var(--gold) 30%,var(--panel2));border:2px solid var(--edge);border-radius:12px;padding:8px 14px;font-weight:600;margin:0 0 14px}
 .tbbtn{font:700 12px var(--body);margin-left:8px;border:2px solid var(--edge);border-radius:8px;background:var(--panel);color:var(--ink);padding:2px 8px;cursor:pointer;vertical-align:middle}
 .tie.won{color:var(--green)}
+.htag.boost{background:var(--green);color:#fff}
+.hcard.boost{background:color-mix(in srgb,var(--green) 18%,var(--panel2))}
+.hcard .tier{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+body.display .hcard .tier{font-size:16px}
 /* Ruhmeshalle */
 .rgrid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start}
 @media (max-width:900px){.rgrid{grid-template-columns:minmax(0,1fr)}}
@@ -255,7 +259,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3
 
 <script>
 const KEY='mk-turnier-v2',RKEY='mk-ruhm-v1';
-const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:3,tb:{}});
+const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:3,bountyStep:10,tb:{}});
 let S=load(), ligaView=lastRound(), isDisplay=false, dIndex=0, dTimer=null, dPaused=false, dStart=0;
 const ROT_MS=15000;
 function lastRound(){return Math.max(0,((S&&S.roundsData)||[]).length-1);}
@@ -296,12 +300,17 @@ const inAnyRound=id=>S.roundsData.some(r=>r.groups.some(g=>g.members.includes(id
 const ligaDone=()=>S.roundsData.length>=S.rounds&&S.roundsData.slice(0,S.rounds).every(roundComplete);
 /* Kopfgeld: Träger wird beim Auslosen in roundsData[i].bounty festgehalten, Bonus wird nur berechnet, nie gespeichert */
 const bountyPts=()=>Math.max(0,Math.round(+S.bountyPts||0));
+const BOUNTY_EXTRA_MAX=5;
+const bountyStep=()=>{const v=Math.round(+S.bountyStep);return Number.isFinite(v)&&v>0?v:0;};
+/* Bonus einer Runde: Grundbonus + 1 je bountyStep Punkte Vorsprung des Trägers (beim Auslosen festgehalten), höchstens +5 */
+const bountyExtra=r=>{const st=bountyStep(),l=r&&+r.bountyLead>0?+r.bountyLead:0;return st?Math.min(BOUNTY_EXTRA_MAX,Math.floor(l/st)):0;};
+const bountyValue=r=>bountyPts()+bountyExtra(r);
 const bountyOf=r=>S.bountyOn!==false&&r&&r.bounty?r.bounty:null;
 function bountyBonus(r,id){
   const b=bountyOf(r);if(!b||b===id)return 0;
   const g=r.groups.find(g=>g.members.includes(b));if(!g||!g.members.includes(id))return 0;
   const sb=g.scores[b],sp=g.scores[id];
-  return typeof sb==='number'&&typeof sp==='number'&&sp>sb?bountyPts():0;
+  return typeof sb==='number'&&typeof sp==='number'&&sp>sb?bountyValue(r):0;
 }
 /* Stechen: S.tb["Gesamt|Bestwert"] = IDs der Stechen-Sieger in Reihenfolge. Ändert sich die Punktzahl, greift der Eintrag nicht mehr. */
 const tieSig=r=>r.total+'|'+r.best;
@@ -363,7 +372,8 @@ function tableHtml(editable){
 }
 function bountyNote(r){
   const b=bountyOf(r);if(!b)return'';
-  return`<p class="bnote">💰 Kopfgeld auf <b>${esc(nameOf(b))}</b>: Wer in derselben Gruppe mehr Punkte holt, bekommt +${bountyPts()} Bonuspunkte.</p>`;
+  const x=bountyExtra(r);
+  return`<p class="bnote">💰 Kopfgeld auf <b>${esc(nameOf(b))}</b>: Wer in derselben Gruppe mehr Punkte holt, bekommt <b>+${bountyValue(r)}</b> Bonuspunkte${x?` (${bountyPts()} + ${x} für ${r.bountyLead} Punkte Vorsprung)`:''}.</p>`;
 }
 const MAX_SCORE=60;
 function groupsHtml(r,editable,gIdx){
@@ -459,14 +469,17 @@ function renderTeilnehmer(){
     </div>
     <div class="row" style="margin-top:14px">
       <label><input type="checkbox" id="bountyOn" ${S.bountyOn!==false?'checked':''}> 💰 Kopfgeld auf den Tabellenführer (ab Runde 2)</label>
-      <label>Bonus <input type="number" id="bountyPts" min="1" max="15" value="${bountyPts()}" ${S.bountyOn!==false?'':'disabled'}> Pkt.</label>
+      <label>Grundbonus <input type="number" id="bountyPts" min="1" max="15" value="${bountyPts()}" ${S.bountyOn!==false?'':'disabled'}> Pkt.</label>
+      <label>+1 je <input type="number" id="bountyStep" min="0" max="50" value="${bountyStep()}" ${S.bountyOn!==false?'':'disabled'}> Pkt. Vorsprung</label>
     </div>
-    <p class="note" style="margin-top:6px">Wer in derselben Gruppe mehr Punkte holt als der Kopfgeld-Träger, bekommt den Bonus für diese Runde.</p>
+    <p class="note" style="margin-top:6px">Wer in derselben Gruppe mehr Punkte holt als der Kopfgeld-Träger, bekommt den Bonus für diese Runde. Je weiter der Führende vor Platz 2 liegt, desto höher (höchstens +${BOUNTY_EXTRA_MAX} extra, 0 = fester Bonus).</p>
     <div class="row" style="margin-top:14px">
       <label class="btn ghost" style="display:inline-block">${S.logo?'Bild ersetzen':'Eigenes Bild für den Kopf hochladen'}<input type="file" id="logoFile" accept="image/*" hidden></label>
       ${S.logo?'<button class="btn danger" id="logoDel">Bild entfernen</button>':''}
     </div>
-    <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile. Ein Emoji am Anfang erscheint auf dem Rad.</p><textarea id="cardsTa" aria-label="Glücksrad-Karten" style="min-height:200px">${esc(cardList().join('\n'))}</textarea><div class="row" style="margin-top:8px"><button class="btn" id="cardsSave">Karten speichern</button><button class="btn ghost" id="cardsDef">Standardkarten</button></div></details>
+    <details><summary>Glücksrad-Karten bearbeiten</summary><p class="note">Eine Karte pro Zeile, mindestens 2 je Rad. Ein Emoji am Anfang erscheint auf dem Rad.</p>
+      ${TIERS.map(([k,l,d])=>`<h3 style="margin:14px 0 4px">${esc(l)}</h3><p class="note" style="margin:0 0 6px">${esc(d)}</p><textarea data-tier="${k}" aria-label="Karten ${esc(l)}" style="min-height:120px">${esc(tierCards(k).join('\n'))}</textarea>`).join('')}
+      <div class="row" style="margin-top:8px"><button class="btn" id="cardsSave">Karten speichern</button><button class="btn ghost" id="cardsDef">Standardkarten</button></div></details>
     <p class="note">Alles wird nur in diesem Browser auf diesem Gerät gespeichert. Zum Mitnehmen auf ein anderes Gerät: sichern und dort laden.</p>
     <div class="row" style="margin-top:10px">
       <button class="btn ghost" id="expBtn">Stand sichern (Datei)</button>
@@ -482,13 +495,17 @@ function renderTeilnehmer(){
   $('consoles').onchange=e=>{S.consoles=+e.target.value;persist();render();};
   $('rounds').onchange=e=>{S.rounds=+e.target.value;persist();render();};
   $('bountyOn').onchange=e=>{S.bountyOn=e.target.checked;persist();render();};
+  $('bountyStep').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=0&&v<=50)){alert('Bitte einen Wert zwischen 0 und 50 eintragen (0 = fester Bonus).');e.target.value=bountyStep();return;}S.bountyStep=v;persist();render();};
   $('bountyPts').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=1&&v<=15)){alert('Bitte einen Bonus zwischen 1 und 15 Punkten eintragen.');e.target.value=bountyPts();return;}S.bountyPts=v;persist();render();};
   $('expBtn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='mario-kart-turnier-stand.json';a.click();};
   $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=Object.assign(DEF(),d);ligaView=lastRound();persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
   $('logoFile').onchange=e=>{const file=e.target.files[0];if(!file)return;const img=new Image();img.onload=()=>{const k=Math.min(1,360/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);S.logo=c.toDataURL('image/png');persist();render();URL.revokeObjectURL(img.src);};img.src=URL.createObjectURL(file);};
   const ld=$('logoDel');if(ld)ld.onclick=()=>{delete S.logo;persist();render();};
-  $('cardsSave').onclick=()=>{const l=$('cardsTa').value.split('\n').map(x=>x.trim()).filter(Boolean);if(l.length<2){alert('Bitte mindestens 2 Karten eintragen.');return;}S.cards=l;persist();render();};
-  $('cardsDef').onclick=()=>{delete S.cards;persist();render();};
+  $('cardsSave').onclick=()=>{const t={};
+    for(const ta of $('teilnehmer').querySelectorAll('textarea[data-tier]')){const l=ta.value.split('\n').map(x=>x.trim()).filter(Boolean);
+      if(l.length<2){alert(`Bitte bei „${TIERS.find(x=>x[0]===ta.dataset.tier)[1]}“ mindestens 2 Karten eintragen.`);return;}t[ta.dataset.tier]=l;}
+    S.cardTiers=t;persist();render();};
+  $('cardsDef').onclick=()=>{delete S.cardTiers;persist();render();};
   $('resetBtn').onclick=()=>{if(confirm('Wirklich alles löschen? Teilnehmer und Ergebnisse gehen verloren.')){S=DEF();ligaView=0;persist();render();}};
 }
 function renderLiga(){
@@ -503,7 +520,7 @@ function renderLiga(){
   $('liga').innerHTML=`<h2>Liga</h2>
   <div class="roundbar">${R.map((x,i)=>`<button class="pill ${roundComplete(x)?'done':''}" data-r="${i}" aria-pressed="${i===ligaView}">Runde ${i+1}</button>`).join('')}</div>
   <p class="muted">Pro Gruppe ein VS-Rennen mit 4 Zufallsstrecken. Danach die Gesamtpunkte eintragen, die das Spiel anzeigt.</p>
-  ${S.pen&&S.pen[ligaView+1]?`<div class="panel"><h3>🎡 Handicaps in Runde ${ligaView+1}</h3>${hcardsHtml(ligaView+1)}</div>`:''}
+  ${S.pen&&S.pen[ligaView+1]?`<div class="panel"><h3>🎡 Glücksrad für Runde ${ligaView+1}</h3>${hcardsHtml(ligaView+1)}</div>`:''}
   ${bountyNote(r)}${groupsHtml(r,true,ligaView)}
   <div class="row" style="margin-top:18px">
     ${atLast&&R.length<S.rounds?`<button class="btn go" id="drawBtn" ${canDraw?'':'disabled'}>Runde ${R.length+1} auslosen</button>`:''}
@@ -524,16 +541,17 @@ function renderLiga(){
   const rd=$('redrawBtn');if(rd)rd.onclick=()=>{S.roundsData.pop();draw();};
   const wb=$('wheelBtn');if(wb)wb.onclick=spinWheel;
   const wp=$('wheelReplay');if(wp)wp.onclick=()=>{if(S.fx&&S.fx.type==='wheel'){S.fx={...S.fx,t:Date.now()};seenFx=S.fx.t;persist();playWheel(S.fx);}};
-  const wdl=$('wheelDel');if(wdl)wdl.onclick=()=>{const wr=wheelRound();if(wr&&confirm('Handicaps für Runde '+wr+' verwerfen? Danach kann neu gedreht werden.')){delete S.pen[wr];persist();render();}};
+  const wdl=$('wheelDel');if(wdl)wdl.onclick=()=>{const wr=wheelRound();if(wr&&confirm('Glücksrad-Ergebnis für Runde '+wr+' verwerfen? Danach kann neu gedreht werden.')){delete S.pen[wr];persist();render();}};
 }
 function draw(){
   const rd={groups:splitIntoGroups(S.players.map(p=>p.id),pairCounts())};
-  if(S.bountyOn!==false&&S.roundsData.length>=1){const lead=standings()[0];if(lead&&rd.groups.some(g=>g.members.includes(lead.id)))rd.bounty=lead.id;}
+  if(S.bountyOn!==false&&S.roundsData.length>=1){const st=standings(),lead=st[0];
+    if(lead&&rd.groups.some(g=>g.members.includes(lead.id))){rd.bounty=lead.id;rd.bountyLead=st[1]?Math.max(0,lead.total-st[1].total):0;}}
   S.roundsData.push(rd);ligaView=S.roundsData.length-1;S.fx={type:'draw',round:S.roundsData.length,t:Date.now()};seenFx=S.fx.t;persist();render();playStart(S.fx.round);}
 function renderTabelle(){
   const plan=planFor(S.players.length);
   $('tabelle').innerHTML=`<h2>Tabelle</h2><div class="panel">${tableHtml(true)}
-  <p class="note">${plan.type!=='direct'?`Grün: Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}${S.bountyOn!==false?`„+${bountyPts()}“ hinter Rundenpunkten ist der Kopfgeld-Bonus, er zählt in die Gesamtpunkte. `:''}Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
+  <p class="note">${plan.type!=='direct'?`Grün: Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}${S.bountyOn!==false?`„+X“ hinter Rundenpunkten ist der Kopfgeld-Bonus, er zählt in die Gesamtpunkte. `:''}Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
   $('tabelle').querySelectorAll('[data-tbwin]').forEach(b=>b.onclick=()=>{
     const r=standings().find(x=>x.id===b.dataset.tbwin);if(!r)return;
     const k=tieSig(r);S.tb=S.tb&&typeof S.tb==='object'?S.tb:{};
@@ -581,7 +599,7 @@ function renderDisplay(){
   if(cur==='baum'){title='Turnierbaum';body=`<div class="panel">${treeHtml(false)}</div>`;}
   if(cur==='sieger'){title='Siegerehrung';body=podiumHtml();}
   if(cur==='ruhm'){title='Ruhmeshalle';body=ruhmHtml(false);}
-  if(cur==='handicap'){const hr=handicapRound();title=`Handicaps für Runde ${hr}`;body=`<div class="panel">${hcardsHtml(hr)}</div>`;}
+  if(cur==='handicap'){const hr=handicapRound();title=`Glücksrad für Runde ${hr}`;body=`<div class="panel">${hcardsHtml(hr)}</div>`;}
   const counter=S.finals?(heatComplete(finalHeat()||{members:[]})?'Ziel!':'Finale'):(R.length?`Runde ${R.length}/${S.rounds}`:'');
   $('anzeige').innerHTML=`<div class="dhead"><div class="brand">${brandHtml()}</div>
     <div class="dright">${counter?`<span class="counter">${counter}</span>`:''}<button class="soundbtn" id="pauseBtn" aria-pressed="${dPaused}" title="Rotation anhalten oder fortsetzen (Taste P)">${dPaused?'▶ Weiter':'⏸ Pause'}</button>${audioOn?'':'<button class="soundbtn" id="soundBtn">Ton an</button>'}
@@ -599,21 +617,47 @@ function togglePause(){dPaused=!dPaused;startRotation();render();}
 
 
 /* ---------- Glücksrad ---------- */
-const DEFAULT_CARDS=[
- '🐢 Fahrzeug mit dem niedrigsten Tempo-Wert',
- '👶 Fahrer: der leichteste Charakter im Spiel',
- '🎲 Fahrer und Fahrzeug per Zufallsauswahl im Menü',
- '👉 Dein linker Nachbar stellt dein Fahrzeug zusammen',
- '📉 Der Tabellenletzte wählt dein Fahrzeug',
- '🏍️ Nur Bike, kein Kart',
- '🛞 Die kleinsten Reifen, die es gibt',
- '🧲 Lenkhilfe einschalten',
- '🚫 Kein Raketenstart erlaubt',
- '🍀 Glück gehabt, kein Handicap!'
+/* Karten in Stufen: Platz 1 zieht „schwer“, Platz 2 „mittel“, Platz 3 „leicht“, die Letzten ziehen „Rückenwind“ */
+const TIERS=[
+ ['schwer','Handicap schwer','Für Platz 1 der Tabelle'],
+ ['mittel','Handicap mittel','Für Platz 2'],
+ ['leicht','Handicap leicht','Für Platz 3'],
+ ['boost','Rückenwind','Für die Letzten der Tabelle (ab 4 Teilnehmern der Letzte, ab 6 die letzten 2)']
 ];
-const cardList=()=>Array.isArray(S.cards)&&S.cards.length>=2?S.cards:DEFAULT_CARDS;
+const DEFAULT_TIERS={
+ schwer:[
+  '🕹️ Nur ein einzelner Joy-Con, quer gehalten',
+  '🙃 Bewegungssteuerung an: gelenkt wird nur durch Neigen',
+  '🪶 Leichtester Fahrer auf Bike mit den kleinsten Reifen',
+  '⏳ Erst losfahren, wenn alle anderen über die Startlinie sind'
+ ],
+ mittel:[
+  '🐢 Fahrzeug mit dem niedrigsten Tempo-Wert',
+  '📉 Der Tabellenletzte stellt dein Fahrzeug zusammen',
+  '💥 Jedes Item sofort benutzen',
+  '🚫 Kein Raketenstart erlaubt'
+ ],
+ leicht:[
+  '🧲 Lenkhilfe einschalten',
+  '🏍️ Nur Bike, kein Kart',
+  '🎲 Fahrer und Fahrzeug per Zufallsauswahl im Menü',
+  '👉 Dein linker Nachbar stellt dein Fahrzeug zusammen',
+  '🍀 Glück gehabt, kein Handicap!'
+ ],
+ boost:[
+  '🗺️ Du wählst eine der 4 Strecken aus',
+  '🛠️ Du stellst das Fahrzeug des Tabellenführers zusammen',
+  '🎯 Ein Gegner deiner Wahl aus deiner Gruppe fährt mit einzelnem Joy-Con quer',
+  '🎒 Du legst die Item-Einstellung für deine Gruppe fest',
+  '🧲 Lenkhilfe und Auto-Gas sind für dich erlaubt'
+ ]
+};
+const tierCards=k=>{const t=S.cardTiers&&S.cardTiers[k];return Array.isArray(t)&&t.length>=2?t:DEFAULT_TIERS[k];};
+const tierLabel=k=>(TIERS.find(t=>t[0]===k)||[,'Handicap'])[1];
+const isBoost=h=>h&&h.tier==='boost';
 function splitCard(c){const m=String(c).match(/^(\S+)\s+(.+)$/);return m&&!/[A-Za-zÄÖÜäöüß0-9]/.test(m[1])?{em:m[1],text:m[2]}:{em:'',text:String(c)};}
 const topCount=()=>Math.min(3,Math.max(1,S.players.length-1));
+const boostCount=()=>{const n=S.players.length;return n>=6?2:n>=4?1:0;};
 function wheelRound(){
   const R=S.roundsData,last=R[R.length-1];if(!last||S.finals)return null;
   if(roundComplete(last)&&R.length<S.rounds)return R.length+1;
@@ -627,20 +671,20 @@ function handicapRound(){
 }
 function htag(round,id){
   const h=S.pen&&S.pen[round]&&S.pen[round].find(x=>x.id===id);if(!h)return'';
-  const c=splitCard(h.card);return`<span class="htag">${esc((c.em?c.em+' ':'')+c.text)}</span>`;
+  const c=splitCard(h.card);return`<span class="htag${isBoost(h)?' boost':''}" title="${esc(tierLabel(h.tier))}">${esc((c.em?c.em+' ':'')+c.text)}</span>`;
 }
 function hcardsHtml(round){
   const list=S.pen&&S.pen[round];if(!list||!list.length)return'';
   const bt=bountyOf(S.roundsData[round-1]);
-  return`<div class="hlist">${list.map(h=>{const c=splitCard(h.card);return`<div class="hcard"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><b>${esc(nameOf(h.id))}${bt===h.id?'<span class="btag" title="Trägt in dieser Runde auch das Kopfgeld">💰 Kopfgeld</span>':''}</b>${esc(c.text)}</div></div>`;}).join('')}</div>`;
+  return`<div class="hlist">${list.map(h=>{const c=splitCard(h.card);return`<div class="hcard${isBoost(h)?' boost':''}"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><span class="tier">${esc(h.tier?tierLabel(h.tier):'Handicap')}</span><b>${esc(nameOf(h.id))}${bt===h.id?'<span class="btag" title="Trägt in dieser Runde auch das Kopfgeld">💰 Kopfgeld</span>':''}</b>${esc(c.text)}</div></div>`;}).join('')}</div>`;
 }
 function wheelAreaHtml(){
   const wr=wheelRound();if(!wr)return'';
   const has=S.pen&&S.pen[wr];
   return`<div class="panel" style="margin-top:18px"><h3>🎡 Glücksrad</h3>${has
-    ?`${wr>S.roundsData.length?hcardsHtml(wr):`<p class="muted" style="margin-top:0">Die Handicaps stehen oben bei den Gruppen.</p>`}
-      <div class="row" style="margin-top:12px"><button class="btn ghost" id="wheelReplay">Animation nochmal zeigen</button><button class="btn danger" id="wheelDel">Handicaps verwerfen</button></div>`
-    :`<p class="muted" style="margin-top:0">Die Top ${topCount()} der Tabelle drehen das Rad und fahren Runde ${wr} mit einem Handicap.</p><button class="btn go" id="wheelBtn">Glücksrad drehen</button>`}</div>`;
+    ?`${wr>S.roundsData.length?hcardsHtml(wr):`<p class="muted" style="margin-top:0">Die Karten stehen oben bei den Gruppen.</p>`}
+      <div class="row" style="margin-top:12px"><button class="btn ghost" id="wheelReplay">Animation nochmal zeigen</button><button class="btn danger" id="wheelDel">Ergebnis verwerfen</button></div>`
+    :`<p class="muted" style="margin-top:0">Vor Runde ${wr}: Die Top ${topCount()} der Tabelle bekommen ein Handicap (${['Platz 1 schwer','Platz 2 mittel','Platz 3 leicht'].slice(0,topCount()).join(', ')})${boostCount()?`, ${boostCount()===1?'der Letzte bekommt':'die letzten 2 bekommen'} Rückenwind`:''}.</p><button class="btn go" id="wheelBtn">Glücksrad drehen</button>`}</div>`;
 }
 function wheelSvg(cards){
   const n=cards.length,seg=360/n,R=100,cols=['var(--red)','var(--yellow)','var(--green)','var(--blue)'];
@@ -693,23 +737,26 @@ function playWin(){
 let wheelRun=0;
 function playWheel(fx){
   if(!fx||!fx.spins||!fx.spins.length)return;
-  const run=++wheelRun,box=$('wheelfx'),cards=fx.cards,T=reduce?.4:4.2;
+  const run=++wheelRun,box=$('wheelfx'),T=reduce?.4:4.2;
+  const cardsOf=s=>Array.isArray(s.cards)&&s.cards.length?s.cards:fx.cards;
+  let cards=cardsOf(fx.spins[0]);
   const wait=(ms,f)=>setTimeout(()=>{if(run===wheelRun)f();},ms);
   box.innerHTML=`<div class="wbox"><div class="wfor" id="wFor"></div><div class="wname" id="wName"></div>
     <div class="wheelbox"><div class="wpointer"></div><div class="wheel" id="wheel" style="transition-duration:${T}s">${wheelSvg(cards)}</div></div>
     <div class="wresult" id="wRes"></div><p class="wskip">Klicken zum Schließen</p></div>`;
   box.classList.add('on');
   box.onclick=()=>{wheelRun++;box.classList.remove('on');};
-  const w=$('wheel'),n=cards.length,seg=360/n;let i=0,rot=0;
+  const w=$('wheel');let i=0,rot=0,seg=360/cards.length;
   const next=()=>{
     if(i>=fx.spins.length){
-      box.querySelector('.wbox').innerHTML=`<div class="wname">Handicaps für Runde ${fx.round}</div>
-        <div class="hlist wsum">${fx.spins.map(s=>{const c=splitCard(cards[s.idx]);return`<div class="hcard"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><b>${esc(s.name)}</b>${esc(c.text)}</div></div>`;}).join('')}</div>
+      box.querySelector('.wbox').innerHTML=`<div class="wname">Glücksrad für Runde ${fx.round}</div>
+        <div class="hlist wsum">${fx.spins.map(s=>{const c=splitCard(cardsOf(s)[s.idx]);return`<div class="hcard${s.tier==='boost'?' boost':''}"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><span class="tier">${esc(s.tier?tierLabel(s.tier):'Handicap')}</span><b>${esc(s.name)}</b>${esc(c.text)}</div></div>`;}).join('')}</div>
         <p class="wskip">Klicken zum Schließen</p>`;
       wait(10000,()=>box.classList.remove('on'));return;
     }
-    const s=fx.spins[i];
-    $('wFor').textContent=`Glücksrad für Runde ${fx.round}, ${i+1} von ${fx.spins.length}`;
+    const s=fx.spins[i],sc=cardsOf(s);
+    if(sc!==cards){cards=sc;seg=360/cards.length;w.innerHTML=wheelSvg(cards);}
+    $('wFor').textContent=`${s.tier?tierLabel(s.tier):'Glücksrad'} · Runde ${fx.round}, ${i+1} von ${fx.spins.length}`;
     $('wName').textContent=s.name;$('wRes').textContent='';
     const target=Math.ceil(rot/360)*360+360*(reduce?1:6)+((360-s.idx*seg)%360)+(s.j||0)*seg*.35;
     wait(800,()=>{
@@ -718,7 +765,7 @@ function playWheel(fx){
       rot=target;
     });
     wait(800+T*1000+200,()=>{
-      const c=splitCard(cards[s.idx]);$('wRes').textContent=(c.em?c.em+' ':'')+c.text;
+      const c=splitCard(sc[s.idx]);$('wRes').textContent=(c.em?c.em+' ':'')+c.text;
       [659,988].forEach((f,k)=>tone(f,.28,'triangle',k*.13,.16));
       i++;wait(3400,next);
     });
@@ -727,10 +774,14 @@ function playWheel(fx){
 }
 function spinWheel(){
   const wr=wheelRound();if(!wr)return;
-  const cards=cardList().slice(),top=standings().slice(0,topCount()),pool=shuffle(cards.map((_,i)=>i));
-  const spins=top.map((r,i)=>({id:r.id,name:r.name,idx:pool[i%pool.length],j:+(Math.random()*2-1).toFixed(3)}));
-  S.pen=S.pen||{};S.pen[wr]=spins.map(s=>({id:s.id,card:cards[s.idx]}));
-  S.fx={type:'wheel',round:wr,cards,spins,t:Date.now()};seenFx=S.fx.t;
+  const st=standings(),top=st.slice(0,topCount()),bc=boostCount(),low=bc?st.slice(-bc).reverse():[];
+  const used={};
+  const pick=(r,tier)=>{const cards=tierCards(tier).slice();used[tier]=used[tier]||shuffle(cards.map((_,i)=>i));
+    const idx=used[tier].length?used[tier].shift():Math.floor(Math.random()*cards.length);
+    return{id:r.id,name:r.name,tier,cards,idx,j:+(Math.random()*2-1).toFixed(3)};};
+  const spins=[...top.map((r,i)=>pick(r,['schwer','mittel','leicht'][i])),...low.filter(r=>!top.includes(r)).map(r=>pick(r,'boost'))];
+  S.pen=S.pen||{};S.pen[wr]=spins.map(s=>({id:s.id,card:s.cards[s.idx],tier:s.tier}));
+  S.fx={type:'wheel',round:wr,spins,t:Date.now()};seenFx=S.fx.t;
   persist();render();unlockAudio();playWheel(S.fx);
 }
 
