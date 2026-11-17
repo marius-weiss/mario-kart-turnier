@@ -2,6 +2,31 @@
 
 Erledigte Aufgaben abhaken (`[x]`) und kurz notieren, was umgesetzt wurde. Die Regeln aus `CLAUDE.md` gelten für alles hier.
 
+Alle drei Aufgaben erst **nach dem Turnier**, in dieser Reihenfolge.
+
+## [ ] Design-Schritte von `testdaten` nach `main` bringen
+
+Erst wenn der Nutzer sie freigibt. Auf `testdaten` fertig und getestet, auf `main` fehlen noch:
+- `13ce435` Einstellungen mit Steppern, Segmenten und Schalter
+- `d5b81e0` Hell/Dunkel-Schalter in der Kopfzeile (System/Hell/Dunkel, `localStorage` `mk-theme`)
+- `c088b2c` Karteneditor fürs Glücksrad
+- der Commit, der diese Aufgabenliste ergänzt hat (`AUFGABEN.md`)
+
+Per Cherry-Pick nach `main` holen, nicht `testdaten` mergen (sonst kommen `testdaten.html`, `muster.html` und die befüllte `ruhmeshalle.json` mit). `fonts/` ist schon auf `main`. Danach `main` wieder in `testdaten` mergen.
+
+## [ ] Eine HTML-Datei statt drei
+
+`mario-kart-turnier.html`, `-bayern.html` und `-sunset.html` unterscheiden sich nur in `data-design`, `<title>` und dem Theme-Stylesheet. Das Design soll stattdessen eine Einstellung sein, wie Hell/Dunkel.
+
+- Eine Seite `mario-kart-turnier.html`. Das Design kommt aus `localStorage` `mk-design` (gibt es schon), optional überschreibbar per `?design=bayern`.
+- Ein Inline-Skript im `<head>` setzt `data-design` und das Theme-Stylesheet vor dem ersten Zeichnen, genau wie heute schon `data-theme`. Kein Flackern.
+- Design-Wechsel ohne Neuladen. Das Beamer-Fenster wechselt live über das `storage`-Event mit, wie beim Hell/Dunkel-Schalter.
+- `mario-kart-turnier-bayern.html` und `-sunset.html` bleiben als winzige Weiterleitungen: `mk-design` setzen, dann auf `mario-kart-turnier.html` mit demselben `#hash` weiter. So funktionieren alte Links, Lesezeichen und offene Beamer-Fenster.
+- `index.html` (auf `testdaten`: Weiterleitung zu `testdaten.html`) und `testdaten.html` (Szenario-Knöpfe öffnen das gewählte Design) anpassen.
+- Muss weiter als `file://` laufen, nur relative Pfade.
+- `CLAUDE.md` (Abschnitt Struktur) danach aktualisieren.
+- Testen: Design wechseln im Bearbeiten-Fenster, Beamer folgt live; alte Adressen `-bayern.html#anzeige` und `-sunset.html#tabelle` landen im richtigen Design und Tab; alle drei Designs hell und dunkel; Turnierstand bleibt unverändert.
+
 ## [ ] „Let's get ready“-Startseite mit Warm-up bis zum Turnierstart
 
 ### Ziel
@@ -23,7 +48,8 @@ Bevor das Turnier offiziell beginnt, sollen alle im Raum auf dem Beamer sehen: w
 
 ### Vorgaben
 - **Welches Spiel?** Bisher gehen die Glücksrad-Karten von **Mario Kart 8 Deluxe** aus (Joy-Con, Lenkhilfe, Auto-Gas). Vor dem Schreiben der Tipps beim Nutzer nachfragen, ob das stimmt. Raketenstart und Fahrzeugwerte unterscheiden sich je nach Spiel. Für MK8 Deluxe gilt: Gas genau dann drücken, wenn die „2“ des Countdowns erscheint; wer zu früh drückt, dreht beim Start durch. Tipps sachlich halten und keine Werte erfinden, die nicht sicher stimmen.
-- **Tipp-Texte editierbar machen.** Am einfachsten über ein Textfeld je Tipp-Block in den Einstellungen, mit Standardtexten wie bei den Glücksrad-Karten. Dann kann der Nutzer sie anpassen, ohne Code zu ändern.
+- **Tipp-Texte editierbar machen.** Mit Standardtexten wie bei den Glücksrad-Karten, damit der Nutzer sie ohne Code anpassen kann. Keine großen Textfelder untereinander (das hat der Nutzer beim alten Karten-Editor ausdrücklich nicht gemocht): eine Zeile je Tipp wie im Karteneditor (`cardEditor()` in `app.js`), mit Bearbeiten, Hinzufügen, Löschen und „Standard wiederherstellen“.
+- **Startzeit** als Einstellungszeile im Stil der übrigen Einstellungen (`srow()`), nicht als loses Feld.
 - **Beamer:**
   - Solange noch keine Liga-Runde ausgelost ist, zeigt `#anzeige` diese Ansichten in der Rotation: Countdown/Warm-up, Ablauf, Raketenstart, Fahrzeugauswahl.
   - Danach verschwinden sie aus der Rotation.
