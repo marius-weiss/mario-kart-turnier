@@ -210,6 +210,9 @@ body.display .btag{font-size:16px}
 .tbbtn{font:700 12px var(--body);margin-left:8px;border:2px solid var(--edge);border-radius:8px;background:var(--panel);color:var(--ink);padding:2px 8px;cursor:pointer;vertical-align:middle}
 .tie.won{color:var(--green)}
 .htag.boost{background:var(--green);color:#fff}
+.bonus.minus{color:var(--red)}
+.bnote .bitem{display:inline-block;margin:4px 10px 0 0;background:var(--panel);border:2px solid var(--edge);border-radius:999px;padding:0 10px;white-space:nowrap}
+.hlist{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
 .hcard.boost{background:color-mix(in srgb,var(--green) 18%,var(--panel2))}
 .hcard .tier{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 body.display .hcard .tier{font-size:16px}
@@ -255,11 +258,15 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--panel2);border:3
 
 <script>
 const KEY='mk-turnier-v2',RKEY='mk-ruhm-v1';
-const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:3,bountyStep:10,tb:{}});
+const DEF=()=>({players:[],consoles:2,rounds:3,roundsData:[],finals:null,pen:{},bountyOn:true,bountyPts:6,bountyStep:5,bountyNear:5,bountyV:2,tb:{}});
 let S=load(), ligaView=lastRound(), isDisplay=false, dIndex=0, dTimer=null, dPaused=false, dStart=0;
 const ROT_MS=15000;
 function lastRound(){return Math.max(0,((S&&S.roundsData)||[]).length-1);}
-function load(){try{const l=localStorage.getItem(KEY);if(l)return Object.assign(DEF(),JSON.parse(l));}catch(e){}return DEF();}
+function migrate(d){const o=Object.assign(DEF(),d);
+  // Kopfgeld v2 (in jeder Gruppe, höhere Werte): alte Stände bekommen einmalig die neuen Standardwerte
+  if(!d||!d.bountyV){o.bountyPts=6;o.bountyStep=5;o.bountyNear=5;o.bountyV=2;}
+  return o;}
+function load(){try{const l=localStorage.getItem(KEY);if(l)return migrate(JSON.parse(l));}catch(e){}return DEF();}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 let seenFx=S.fx?S.fx.t:0;
 window.addEventListener('storage',e=>{if(e.key===RKEY){render();return;}if(e.key!==KEY)return;S=load();
@@ -294,19 +301,43 @@ const roundComplete=r=>r.groups.every(g=>g.members.every(id=>typeof g.scores[id]
 const roundTouched=r=>r.groups.some(g=>Object.keys(g.scores).length>0);
 const inAnyRound=id=>S.roundsData.some(r=>r.groups.some(g=>g.members.includes(id)));
 const ligaDone=()=>S.roundsData.length>=S.rounds&&S.roundsData.slice(0,S.rounds).every(roundComplete);
-/* Kopfgeld: Träger wird beim Auslosen in roundsData[i].bounty festgehalten, Bonus wird nur berechnet, nie gespeichert */
-const bountyPts=()=>Math.max(0,Math.round(+S.bountyPts||0));
-const BOUNTY_EXTRA_MAX=5;
-const bountyStep=()=>{const v=Math.round(+S.bountyStep);return Number.isFinite(v)&&v>0?v:0;};
-/* Bonus einer Runde: Grundbonus + 1 je bountyStep Punkte Vorsprung des Trägers (beim Auslosen festgehalten), höchstens +5 */
-const bountyExtra=r=>{const st=bountyStep(),l=r&&+r.bountyLead>0?+r.bountyLead:0;return st?Math.min(BOUNTY_EXTRA_MAX,Math.floor(l/st)):0;};
-const bountyValue=r=>bountyPts()+bountyExtra(r);
-const bountyOf=r=>S.bountyOn!==false&&r&&r.bounty?r.bounty:null;
+/* Kopfgeld: In jeder Gruppe trägt der in der Tabelle Bestplatzierte das Kopfgeld. Festgehalten beim Auslosen in
+   roundsData[i].bounties = [{id, lead}] (lead = Vorsprung auf den Nächsten seiner Gruppe). Alte Stände: roundsData[i].bounty.
+   Bonus wird nur berechnet, nie in die Rohpunkte gemischt. */
+const BOUNTY_EXTRA_MAX=10;
+const numSet=(v,min,max,def)=>{v=Math.round(+v);return Number.isFinite(v)&&v>=min&&v<=max?v:def;};
+const bountyPts=()=>numSet(S.bountyPts,0,30,6);
+const bountyStep=()=>numSet(S.bountyStep,0,50,5);
+const bountyNear=()=>numSet(S.bountyNear,0,30,5);
+const bountyList=r=>S.bountyOn===false||!r?[]:Array.isArray(r.bounties)?r.bounties:r.bounty?[{id:r.bounty,lead:+r.bountyLead||0}]:[];
+const bountyExtra=b=>{const st=bountyStep(),l=+b.lead>0?+b.lead:0;return st?Math.min(BOUNTY_EXTRA_MAX,Math.floor(l/st)):0;};
+const bountyValue=b=>bountyPts()+bountyExtra(b);
+const isCarrier=(r,id)=>bountyList(r).some(b=>b.id===id);
 function bountyBonus(r,id){
-  const b=bountyOf(r);if(!b||b===id)return 0;
-  const g=r.groups.find(g=>g.members.includes(b));if(!g||!g.members.includes(id))return 0;
-  const sb=g.scores[b],sp=g.scores[id];
-  return typeof sb==='number'&&typeof sp==='number'&&sp>sb?bountyValue(r):0;
+  const g=r.groups.find(g=>g.members.includes(id));if(!g)return 0;
+  const b=bountyList(r).find(b=>b.id!==id&&g.members.includes(b.id));if(!b)return 0;
+  const sb=g.scores[b.id],sp=g.scores[id];if(typeof sb!=='number'||typeof sp!=='number')return 0;
+  if(sp>sb)return bountyValue(b);
+  const near=bountyNear();return near&&sb-sp<=near?Math.ceil(bountyValue(b)/2):0;
+}
+/* Glücksrad-Punkte: Effekt wird beim Drehen aus dem Kartentext gelesen und in S.pen[runde][].eff gespeichert */
+const fmtNum=v=>String(+(+v).toFixed(2)).replace('.',',');
+function parseEff(text){
+  const t=String(text);let m;
+  if((m=t.match(/klau\w*\s+(\d+)/i)))return{t:'steal',v:+m[1]};
+  if((m=t.match(/(?:^|\s)[×x]\s*(\d+(?:[.,]\d+)?)/)))return{t:'mult',v:Math.min(5,+m[1].replace(',','.'))};
+  if((m=t.match(/\+\s*(\d+)\s*(?:Bonus)?punkt/i)))return{t:'plus',v:+m[1]};
+  return null;
+}
+const effShort=e=>!e?'':e.t==='mult'?'×'+fmtNum(e.v):e.t==='plus'?'+'+e.v:'−'+e.v;
+function luckBonus(ri,id){
+  const r=S.roundsData[ri],list=S.pen&&S.pen[ri+1];if(!r||!Array.isArray(list))return 0;
+  const sc=pid=>{for(const g of r.groups)if(g.members.includes(pid))return typeof g.scores[pid]==='number'?g.scores[pid]:null;return null;};
+  let b=0;const mine=sc(id);
+  for(const h of list){const e=h.eff;if(!e)continue;
+    if(h.id===id&&mine!==null){if(e.t==='mult')b+=Math.round(mine*(e.v-1));else b+=e.v;}
+    if(e.t==='steal'&&e.from===id&&h.id!==id&&sc(h.id)!==null)b-=e.v;}
+  return b;
 }
 /* Stechen: S.tb["Gesamt|Bestwert"] = IDs der Stechen-Sieger in Reihenfolge. Ändert sich die Punktzahl, greift der Eintrag nicht mehr. */
 const tieSig=r=>r.total+'|'+r.best;
@@ -314,9 +345,10 @@ const tbRank=r=>{const l=S.tb&&S.tb[tieSig(r)],i=Array.isArray(l)?l.indexOf(r.id
 function standings(){
   const rows=S.players.map(p=>{
     const per=S.roundsData.map(r=>{for(const g of r.groups)if(g.members.includes(p.id))return typeof g.scores[p.id]==='number'?g.scores[p.id]:null;return null;});
-    const bonus=S.roundsData.map(r=>bountyBonus(r,p.id));
+    const bb=S.roundsData.map(r=>bountyBonus(r,p.id)),lb=S.roundsData.map((r,i)=>luckBonus(i,p.id));
+    const bonus=bb.map((x,i)=>x+lb[i]);
     const v=per.filter(x=>x!==null);
-    return{id:p.id,name:p.name,per,bonus,total:v.reduce((a,b)=>a+b,0)+bonus.reduce((a,b)=>a+b,0),best:v.length?Math.max(...v):0};
+    return{id:p.id,name:p.name,per,bb,lb,bonus,total:v.reduce((a,b)=>a+b,0)+bonus.reduce((a,b)=>a+b,0),best:v.length?Math.max(...v):0};
   });
   rows.forEach(r=>r.tbr=tbRank(r));
   rows.sort((a,b)=>b.total-a.total||b.best-a.best||(a.tbr===b.tbr?0:a.tbr<b.tbr?-1:1)||a.name.localeCompare(b.name,'de'));
@@ -361,23 +393,27 @@ function tableHtml(editable){
   const nR=Math.max(S.rounds,S.roundsData.length);
   const tieCell=r=>r.tie?`<span class="tie">Stechen</span>${editable?`<button class="tbbtn" data-tbwin="${r.id}" aria-label="${esc(r.name)} hat das Stechen gewonnen">hat gewonnen</button>`:''}`
     :r.tieWon?`<span class="tie won">Stechen ✓</span>${editable?`<button class="tbbtn" data-tbreset="${esc(tieSig(r))}" aria-label="Stechen bei ${esc(r.name)} zurücksetzen" title="Stechen zurücksetzen">↺</button>`:''}`:'';
-  const cell=(r,k)=>r.per[k]==null?'–':r.per[k]+(r.bonus[k]?` <span class="bonus" title="Kopfgeld-Bonus">+${r.bonus[k]}</span>`:'');
+  const cell=(r,k)=>(r.per[k]==null?'–':r.per[k])+bonusChips(r.bb[k],r.lb[k]);
   return`<div class="scroll"><table><thead><tr><th>Platz</th><th>Name</th>${Array.from({length:nR},(_,i)=>`<th class="num">R${i+1}</th>`).join('')}<th class="num">Gesamt</th></tr></thead>
   <tbody>${st.map((r,i)=>`<tr class="${i<plan.qual&&plan.type!=='direct'?'qual':''}"><td>${badge(i+1)}</td><td>${esc(r.name)}${tieCell(r)}</td>
   ${Array.from({length:nR},(_,k)=>`<td class="num">${cell(r,k)}</td>`).join('')}<td class="num total">${r.total}</td></tr>`).join('')}</tbody></table></div>`;
 }
+function bonusChips(bb,lb){
+  return(bb?` <span class="bonus" title="Kopfgeld-Bonus">+${bb}💰</span>`:'')+(lb>0?` <span class="bonus" title="Glücksrad">+${lb}🍀</span>`:lb<0?` <span class="bonus minus" title="Punkteklau">−${-lb}🦝</span>`:'');
+}
 function bountyNote(r){
-  const b=bountyOf(r);if(!b)return'';
-  const x=bountyExtra(r);
-  return`<p class="bnote">💰 Kopfgeld auf <b>${esc(nameOf(b))}</b>: Wer in derselben Gruppe mehr Punkte holt, bekommt <b>+${bountyValue(r)}</b> Bonuspunkte${x?` (${bountyPts()} + ${x} für ${r.bountyLead} Punkte Vorsprung)`:''}.</p>`;
+  const l=bountyList(r);if(!l.length)return'';
+  const near=bountyNear();
+  return`<p class="bnote">💰 <b>Kopfgeld in jeder Gruppe:</b> Wer mehr Punkte holt als der Träger seiner Gruppe, kassiert das Kopfgeld${near?`, wer höchstens ${near} Punkte dahinter bleibt, die Hälfte`:''}.
+    ${l.map(b=>`<span class="bitem">${esc(nameOf(b.id))} <b>+${bountyValue(b)}</b></span>`).join('')}</p>`;
 }
 const MAX_SCORE=60;
 function groupsHtml(r,editable,gIdx){
   return`<div class="groups">${r.groups.map((g,gi)=>`<article class="group c${g.console}">
     <div class="gh"><h3>Gruppe ${gi+1}</h3><span>Konsole ${g.console} · Durchgang ${g.wave}</span></div>
-    <div class="gb">${g.members.map(id=>`<div class="prow"><span>${esc(nameOf(id))}${bountyOf(r)===id?'<span class="btag" title="Kopfgeld-Träger">💰 Kopfgeld</span>':''}${htag(gIdx+1,id)}</span>${editable
+    <div class="gb">${g.members.map(id=>`<div class="prow"><span>${esc(nameOf(id))}${isCarrier(r,id)?`<span class="btag" title="Kopfgeld-Träger dieser Gruppe">💰 +${bountyValue(bountyList(r).find(b=>b.id===id))}</span>`:''}${htag(gIdx+1,id)}</span>${editable
       ?`<input type="number" min="0" max="${MAX_SCORE}" inputmode="numeric" aria-label="Punkte ${esc(nameOf(id))}" data-key="sc-${gIdx}-${gi}-${id}" data-g="${gi}" data-p="${id}" value="${typeof g.scores[id]==='number'?g.scores[id]:''}">`
-      :`<b>${typeof g.scores[id]==='number'?g.scores[id]+' Pkt.'+(bountyBonus(r,id)?` <span class="bonus">+${bountyBonus(r,id)}</span>`:''):''}</b>`}</div>`).join('')}</div></article>`).join('')}</div>`;
+      :`<b>${typeof g.scores[id]==='number'?g.scores[id]+' Pkt.'+bonusChips(bountyBonus(r,id),luckBonus(gIdx,id)):''}</b>`}</div>`).join('')}</div></article>`).join('')}</div>`;
 }
 function heatNode(h,key,editable,cls,from,placeholder){
   let body;
@@ -465,10 +501,11 @@ function renderTeilnehmer(){
     </div>
     <div class="row" style="margin-top:14px">
       <label><input type="checkbox" id="bountyOn" ${S.bountyOn!==false?'checked':''}> 💰 Kopfgeld auf den Tabellenführer (ab Runde 2)</label>
-      <label>Grundbonus <input type="number" id="bountyPts" min="1" max="15" value="${bountyPts()}" ${S.bountyOn!==false?'':'disabled'}> Pkt.</label>
+      <label>Grundbonus <input type="number" id="bountyPts" min="0" max="30" value="${bountyPts()}" ${S.bountyOn!==false?'':'disabled'}> Pkt.</label>
       <label>+1 je <input type="number" id="bountyStep" min="0" max="50" value="${bountyStep()}" ${S.bountyOn!==false?'':'disabled'}> Pkt. Vorsprung</label>
+      <label>Halbes Kopfgeld bis <input type="number" id="bountyNear" min="0" max="30" value="${bountyNear()}" ${S.bountyOn!==false?'':'disabled'}> Pkt. dahinter</label>
     </div>
-    <p class="note" style="margin-top:6px">Wer in derselben Gruppe mehr Punkte holt als der Kopfgeld-Träger, bekommt den Bonus für diese Runde. Je weiter der Führende vor Platz 2 liegt, desto höher (höchstens +${BOUNTY_EXTRA_MAX} extra, 0 = fester Bonus).</p>
+    <p class="note" style="margin-top:6px">In jeder Gruppe trägt der in der Tabelle Bestplatzierte das Kopfgeld. Wer ihn schlägt, bekommt Grundbonus + 1 je Vorsprungsstufe auf den Nächsten seiner Gruppe (höchstens +${BOUNTY_EXTRA_MAX}). Wer knapp dahinter bleibt, bekommt die Hälfte (0 = aus).</p>
     <div class="row" style="margin-top:14px">
       <label class="btn ghost" style="display:inline-block">${S.logo?'Bild ersetzen':'Eigenes Bild für den Kopf hochladen'}<input type="file" id="logoFile" accept="image/*" hidden></label>
       ${S.logo?'<button class="btn danger" id="logoDel">Bild entfernen</button>':''}
@@ -491,10 +528,12 @@ function renderTeilnehmer(){
   $('consoles').onchange=e=>{S.consoles=+e.target.value;persist();render();};
   $('rounds').onchange=e=>{S.rounds=+e.target.value;persist();render();};
   $('bountyOn').onchange=e=>{S.bountyOn=e.target.checked;persist();render();};
-  $('bountyStep').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=0&&v<=50)){alert('Bitte einen Wert zwischen 0 und 50 eintragen (0 = fester Bonus).');e.target.value=bountyStep();return;}S.bountyStep=v;persist();render();};
-  $('bountyPts').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=1&&v<=15)){alert('Bitte einen Bonus zwischen 1 und 15 Punkten eintragen.');e.target.value=bountyPts();return;}S.bountyPts=v;persist();render();};
+  const numIn=(id,min,max,cur,key,msg)=>{$(id).onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=min&&v<=max)){alert(msg);e.target.value=cur();return;}S[key]=v;persist();render();};};
+  numIn('bountyStep',0,50,bountyStep,'bountyStep','Bitte einen Wert zwischen 0 und 50 eintragen (0 = fester Bonus).');
+  numIn('bountyNear',0,30,bountyNear,'bountyNear','Bitte einen Wert zwischen 0 und 30 eintragen (0 = kein halbes Kopfgeld).');
+  $('bountyPts').onchange=e=>{const v=Math.round(+e.target.value);if(!(v>=0&&v<=30)){alert('Bitte einen Bonus zwischen 0 und 30 Punkten eintragen.');e.target.value=bountyPts();return;}S.bountyPts=v;persist();render();};
   $('expBtn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='mario-kart-turnier-stand.json';a.click();};
-  $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=Object.assign(DEF(),d);ligaView=lastRound();persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
+  $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.players))throw 0;S=migrate(d);ligaView=lastRound();persist();render();}catch(x){alert('Die Datei ist kein gültiger Turnierstand.');}});};
   $('logoFile').onchange=e=>{const file=e.target.files[0];if(!file)return;const img=new Image();img.onload=()=>{const k=Math.min(1,360/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);S.logo=c.toDataURL('image/png');persist();render();URL.revokeObjectURL(img.src);};img.src=URL.createObjectURL(file);};
   const ld=$('logoDel');if(ld)ld.onclick=()=>{delete S.logo;persist();render();};
   $('cardsSave').onclick=()=>{const t={};
@@ -541,13 +580,15 @@ function renderLiga(){
 }
 function draw(){
   const rd={groups:splitIntoGroups(S.players.map(p=>p.id),pairCounts())};
-  if(S.bountyOn!==false&&S.roundsData.length>=1){const st=standings(),lead=st[0];
-    if(lead&&rd.groups.some(g=>g.members.includes(lead.id))){rd.bounty=lead.id;rd.bountyLead=st[1]?Math.max(0,lead.total-st[1].total):0;}}
+  if(S.bountyOn!==false&&S.roundsData.length>=1){const st=standings(),pos=new Map(st.map((x,i)=>[x.id,i]));
+    rd.bounties=rd.groups.filter(g=>g.members.length>=2).map(g=>{
+      const o=g.members.slice().sort((a,b)=>pos.get(a)-pos.get(b)),c=st[pos.get(o[0])],n=st[pos.get(o[1])];
+      return{id:c.id,lead:Math.max(0,c.total-n.total)};});}
   S.roundsData.push(rd);ligaView=S.roundsData.length-1;S.fx={type:'draw',round:S.roundsData.length,t:Date.now()};seenFx=S.fx.t;persist();render();playStart(S.fx.round);}
 function renderTabelle(){
   const plan=planFor(S.players.length);
   $('tabelle').innerHTML=`<h2>Tabelle</h2><div class="panel">${tableHtml(true)}
-  <p class="note">${plan.type!=='direct'?`Grün: Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}${S.bountyOn!==false?`„+X“ hinter Rundenpunkten ist der Kopfgeld-Bonus, er zählt in die Gesamtpunkte. `:''}Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
+  <p class="note">${plan.type!=='direct'?`Grün: Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}Hinter den Rundenpunkten: 💰 Kopfgeld, 🍀 Glücksrad, 🦝 Punkteklau, alles zählt in die Gesamtpunkte. Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
   $('tabelle').querySelectorAll('[data-tbwin]').forEach(b=>b.onclick=()=>{
     const r=standings().find(x=>x.id===b.dataset.tbwin);if(!r)return;
     const k=tieSig(r);S.tb=S.tb&&typeof S.tb==='object'?S.tb:{};
@@ -618,7 +659,9 @@ const TIERS=[
  ['schwer','Handicap schwer','Für Platz 1 der Tabelle'],
  ['mittel','Handicap mittel','Für Platz 2'],
  ['leicht','Handicap leicht','Für Platz 3'],
- ['boost','Rückenwind','Für die Letzten der Tabelle (ab 4 Teilnehmern der Letzte, ab 6 die letzten 2)']
+ ['g1','Glück groß','Unteres Drittel der übrigen Spieler'],
+ ['g2','Glück mittel','Mittleres Drittel'],
+ ['g3','Glück klein','Oberes Drittel (direkt hinter den Top 3)']
 ];
 const DEFAULT_TIERS={
  schwer:[
@@ -640,20 +683,39 @@ const DEFAULT_TIERS={
   '👉 Dein linker Nachbar stellt dein Fahrzeug zusammen',
   '🍀 Glück gehabt, kein Handicap!'
  ],
- boost:[
-  '🗺️ Du wählst eine der 4 Strecken aus',
+ g1:[
+  '✨ Punkte ×2 in dieser Runde',
+  '✨ Punkte ×2 in dieser Runde',
+  '🔥 Punkte ×1,5 in dieser Runde',
+  '🎁 +10 Punkte geschenkt',
+  '🦝 Punkteklau: Du klaust 8 Punkte vom Tabellenführer',
+  '🗺️ Du wählst eine der 4 Strecken, dazu Punkte ×1,5'
+ ],
+ g2:[
+  '🔥 Punkte ×1,5 in dieser Runde',
+  '⚡ Punkte ×1,25 in dieser Runde',
+  '🎁 +6 Punkte geschenkt',
+  '🦝 Punkteklau: Du klaust 5 Punkte vom Tabellenführer',
   '🛠️ Du stellst das Fahrzeug des Tabellenführers zusammen',
+  '🎒 Du legst die Item-Einstellung für deine Gruppe fest'
+ ],
+ g3:[
+  '⚡ Punkte ×1,25 in dieser Runde',
+  '🎁 +3 Punkte geschenkt',
+  '🦝 Punkteklau: Du klaust 3 Punkte vom Tabellenführer',
   '🎯 Ein Gegner deiner Wahl aus deiner Gruppe fährt mit einzelnem Joy-Con quer',
-  '🎒 Du legst die Item-Einstellung für deine Gruppe fest',
-  '🧲 Lenkhilfe und Auto-Gas sind für dich erlaubt'
+  '🧲 Lenkhilfe und Auto-Gas sind für dich erlaubt',
+  '😶 Niete, diesmal nichts'
  ]
 };
 const tierCards=k=>{const t=S.cardTiers&&S.cardTiers[k];return Array.isArray(t)&&t.length>=2?t:DEFAULT_TIERS[k];};
-const tierLabel=k=>(TIERS.find(t=>t[0]===k)||[,'Handicap'])[1];
-const isBoost=h=>h&&h.tier==='boost';
+const tierLabel=k=>k==='boost'?'Rückenwind':(TIERS.find(t=>t[0]===k)||[,'Handicap'])[1];
+const isLuckTier=t=>/^g\d$/.test(t||'');
+const isBoost=h=>!!h&&(h.tier==='boost'||isLuckTier(h.tier));
 function splitCard(c){const m=String(c).match(/^(\S+)\s+(.+)$/);return m&&!/[A-Za-zÄÖÜäöüß0-9]/.test(m[1])?{em:m[1],text:m[2]}:{em:'',text:String(c)};}
 const topCount=()=>Math.min(3,Math.max(1,S.players.length-1));
-const boostCount=()=>{const n=S.players.length;return n>=6?2:n>=4?1:0;};
+/* Glücksstufe für alle außer den Top 3 (rest ist nach Tabelle sortiert): unteres Drittel g1, Mitte g2, oben g3 */
+function luckTiers(rest){const k=rest.length,a=Math.ceil(k/3),b=Math.ceil(2*k/3);return rest.map((r,i)=>{const j=k-1-i;return j<a?'g1':j<b?'g2':'g3';});}
 function wheelRound(){
   const R=S.roundsData,last=R[R.length-1];if(!last||S.finals)return null;
   if(roundComplete(last)&&R.length<S.rounds)return R.length+1;
@@ -665,14 +727,15 @@ function handicapRound(){
   for(const x of [R.length+1,R.length])if(x>0&&x<=S.rounds&&S.pen[x]&&!(R[x-1]&&roundComplete(R[x-1])))return x;
   return null;
 }
+const stealNote=h=>h&&h.eff&&h.eff.t==='steal'&&h.eff.from?` (von ${nameOf(h.eff.from)})`:'';
 function htag(round,id){
   const h=S.pen&&S.pen[round]&&S.pen[round].find(x=>x.id===id);if(!h)return'';
-  const c=splitCard(h.card);return`<span class="htag${isBoost(h)?' boost':''}" title="${esc(tierLabel(h.tier))}">${esc((c.em?c.em+' ':'')+c.text)}</span>`;
+  const c=splitCard(h.card);return`<span class="htag${isBoost(h)?' boost':''}" title="${esc(tierLabel(h.tier))}">${esc((c.em?c.em+' ':'')+c.text+stealNote(h))}</span>`;
 }
 function hcardsHtml(round){
   const list=S.pen&&S.pen[round];if(!list||!list.length)return'';
-  const bt=bountyOf(S.roundsData[round-1]);
-  return`<div class="hlist">${list.map(h=>{const c=splitCard(h.card);return`<div class="hcard${isBoost(h)?' boost':''}"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><span class="tier">${esc(h.tier?tierLabel(h.tier):'Handicap')}</span><b>${esc(nameOf(h.id))}${bt===h.id?'<span class="btag" title="Trägt in dieser Runde auch das Kopfgeld">💰 Kopfgeld</span>':''}</b>${esc(c.text)}</div></div>`;}).join('')}</div>`;
+  const rr=S.roundsData[round-1];
+  return`<div class="hlist">${list.map(h=>{const c=splitCard(h.card);return`<div class="hcard${isBoost(h)?' boost':''}"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><span class="tier">${esc(h.tier?tierLabel(h.tier):'Handicap')}</span><b>${esc(nameOf(h.id))}${isCarrier(rr,h.id)?'<span class="btag" title="Trägt in dieser Runde auch ein Kopfgeld">💰 Kopfgeld</span>':''}</b>${esc(c.text+stealNote(h))}</div></div>`;}).join('')}</div>`;
 }
 function wheelAreaHtml(){
   const wr=wheelRound();if(!wr)return'';
@@ -680,7 +743,7 @@ function wheelAreaHtml(){
   return`<div class="panel" style="margin-top:18px"><h3>🎡 Glücksrad</h3>${has
     ?`${wr>S.roundsData.length?hcardsHtml(wr):`<p class="muted" style="margin-top:0">Die Karten stehen oben bei den Gruppen.</p>`}
       <div class="row" style="margin-top:12px"><button class="btn ghost" id="wheelReplay">Animation nochmal zeigen</button><button class="btn danger" id="wheelDel">Ergebnis verwerfen</button></div>`
-    :`<p class="muted" style="margin-top:0">Vor Runde ${wr}: Die Top ${topCount()} der Tabelle bekommen ein Handicap (${['Platz 1 schwer','Platz 2 mittel','Platz 3 leicht'].slice(0,topCount()).join(', ')})${boostCount()?`, ${boostCount()===1?'der Letzte bekommt':'die letzten 2 bekommen'} Rückenwind`:''}.</p><button class="btn go" id="wheelBtn">Glücksrad drehen</button>`}</div>`;
+    :`<p class="muted" style="margin-top:0">Vor Runde ${wr}: Die Top ${topCount()} der Tabelle bekommen ein Handicap (${['Platz 1 schwer','Platz 2 mittel','Platz 3 leicht'].slice(0,topCount()).join(', ')}). Alle anderen drehen das Glücksrad: Je weiter unten, desto größer die Chancen auf Multiplikator, Geschenk oder Punkteklau.</p><button class="btn go" id="wheelBtn">Glücksrad drehen</button>`}</div>`;
 }
 function wheelSvg(cards){
   const n=cards.length,seg=360/n,R=100,cols=['var(--red)','var(--yellow)','var(--green)','var(--blue)'];
@@ -690,7 +753,7 @@ function wheelSvg(cards){
     const [x0,y0]=pt(i*seg-seg/2,R),[x1,y1]=pt(i*seg+seg/2,R);
     const col=(i===n-1&&n%4===1)?cols[2]:cols[i%4];
     s+=`<path d="M0 0L${x0} ${y0}A${R} ${R} 0 0 1 ${x1} ${y1}Z" style="fill:${col}" stroke="#000" stroke-width="2"/>`;
-    const [lx,ly]=pt(i*seg,R*.7),em=splitCard(c).em||String(i+1);
+    const [lx,ly]=pt(i*seg,R*.7),ef=parseEff(c),em=ef&&ef.t!=='steal'?effShort(ef):(splitCard(c).em||String(i+1));
     s+=`<text x="${lx}" y="${ly}" transform="rotate(${(i*seg).toFixed(2)} ${lx} ${ly})" text-anchor="middle" dominant-baseline="central" font-size="${Math.round(Math.min(26,Math.max(13,150/n)))}" font-weight="900" fill="#1B1D29">${esc(em)}</text>`;
   });
   return`<svg viewBox="-108 -108 216 216" aria-hidden="true"><circle r="106" fill="#000"/>${s}<circle r="15" fill="#fff" stroke="#000" stroke-width="3"/></svg>`;
@@ -733,50 +796,56 @@ function playWin(){
 let wheelRun=0;
 function playWheel(fx){
   if(!fx||!fx.spins||!fx.spins.length)return;
-  const run=++wheelRun,box=$('wheelfx'),T=reduce?.4:4.2;
+  const run=++wheelRun,box=$('wheelfx');
+  const dur=s=>reduce?.4:isLuckTier(s.tier)?2.6:4.2,pause=s=>isLuckTier(s.tier)?2200:3400;
   const cardsOf=s=>Array.isArray(s.cards)&&s.cards.length?s.cards:fx.cards;
+  const victim=s=>s.eff&&s.eff.t==='steal'&&s.eff.from?` (von ${nameOf(s.eff.from)})`:'';
   let cards=cardsOf(fx.spins[0]);
-  const wait=(ms,f)=>setTimeout(()=>{if(run===wheelRun)f();},ms);
+  const waitFor=r=>(ms,f)=>setTimeout(()=>{if(r===wheelRun)f();},ms),wait=waitFor(run);
   box.innerHTML=`<div class="wbox"><div class="wfor" id="wFor"></div><div class="wname" id="wName"></div>
-    <div class="wheelbox"><div class="wpointer"></div><div class="wheel" id="wheel" style="transition-duration:${T}s">${wheelSvg(cards)}</div></div>
-    <div class="wresult" id="wRes"></div><p class="wskip">Klicken zum Schließen</p></div>`;
+    <div class="wheelbox"><div class="wpointer"></div><div class="wheel" id="wheel">${wheelSvg(cards)}</div></div>
+    <div class="wresult" id="wRes"></div><p class="wskip"><button class="soundbtn" id="wSkip">Alle Ergebnisse zeigen</button> · Klicken zum Schließen</p></div>`;
   box.classList.add('on');
   box.onclick=()=>{wheelRun++;box.classList.remove('on');};
+  const summary=wt=>{
+    box.querySelector('.wbox').innerHTML=`<div class="wname">Glücksrad für Runde ${fx.round}</div>
+      <div class="hlist wsum">${fx.spins.map(s=>{const c=splitCard(cardsOf(s)[s.idx]);return`<div class="hcard${isBoost(s)?' boost':''}"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><span class="tier">${esc(s.tier?tierLabel(s.tier):'Handicap')}</span><b>${esc(s.name)}</b>${esc(c.text+victim(s))}</div></div>`;}).join('')}</div>
+      <p class="wskip">Klicken zum Schließen</p>`;
+    wt(20000,()=>box.classList.remove('on'));};
+  $('wSkip').onclick=e=>{e.stopPropagation();summary(waitFor(++wheelRun));};
   const w=$('wheel');let i=0,rot=0,seg=360/cards.length;
   const next=()=>{
-    if(i>=fx.spins.length){
-      box.querySelector('.wbox').innerHTML=`<div class="wname">Glücksrad für Runde ${fx.round}</div>
-        <div class="hlist wsum">${fx.spins.map(s=>{const c=splitCard(cardsOf(s)[s.idx]);return`<div class="hcard${s.tier==='boost'?' boost':''}"><span class="em" aria-hidden="true">${esc(c.em||'🎡')}</span><div><span class="tier">${esc(s.tier?tierLabel(s.tier):'Handicap')}</span><b>${esc(s.name)}</b>${esc(c.text)}</div></div>`;}).join('')}</div>
-        <p class="wskip">Klicken zum Schließen</p>`;
-      wait(10000,()=>box.classList.remove('on'));return;
-    }
-    const s=fx.spins[i],sc=cardsOf(s);
+    if(i>=fx.spins.length){summary(wait);return;}
+    const s=fx.spins[i],sc=cardsOf(s),T=dur(s);
     if(sc!==cards){cards=sc;seg=360/cards.length;w.innerHTML=wheelSvg(cards);}
+    w.style.transitionDuration=T+'s';
     $('wFor').textContent=`${s.tier?tierLabel(s.tier):'Glücksrad'} · Runde ${fx.round}, ${i+1} von ${fx.spins.length}`;
     $('wName').textContent=s.name;$('wRes').textContent='';
-    const target=Math.ceil(rot/360)*360+360*(reduce?1:6)+((360-s.idx*seg)%360)+(s.j||0)*seg*.35;
-    wait(800,()=>{
+    const target=Math.ceil(rot/360)*360+360*(reduce?1:isLuckTier(s.tier)?4:6)+((360-s.idx*seg)%360)+(s.j||0)*seg*.35;
+    wait(600,()=>{
       w.style.transform=`rotate(${target}deg)`;
       if(!reduce){const total=target-rot;for(let k=1;k*seg<total;k++)tone(1500,.025,'square',T*(1-Math.cbrt(1-k*seg/total)),.04);}
       rot=target;
     });
-    wait(800+T*1000+200,()=>{
-      const c=splitCard(sc[s.idx]);$('wRes').textContent=(c.em?c.em+' ':'')+c.text;
+    wait(600+T*1000+200,()=>{
+      const c=splitCard(sc[s.idx]);$('wRes').textContent=(c.em?c.em+' ':'')+c.text+victim(s);
       [659,988].forEach((f,k)=>tone(f,.28,'triangle',k*.13,.16));
-      i++;wait(3400,next);
+      i++;wait(pause(s),next);
     });
   };
   next();
 }
 function spinWheel(){
   const wr=wheelRound();if(!wr)return;
-  const st=standings(),top=st.slice(0,topCount()),bc=boostCount(),low=bc?st.slice(-bc).reverse():[];
+  const st=standings(),top=st.slice(0,topCount()),rest=st.slice(top.length),lt=luckTiers(rest),leader=st[0];
   const used={};
   const pick=(r,tier)=>{const cards=tierCards(tier).slice();used[tier]=used[tier]||shuffle(cards.map((_,i)=>i));
     const idx=used[tier].length?used[tier].shift():Math.floor(Math.random()*cards.length);
-    return{id:r.id,name:r.name,tier,cards,idx,j:+(Math.random()*2-1).toFixed(3)};};
-  const spins=[...top.map((r,i)=>pick(r,['schwer','mittel','leicht'][i])),...low.filter(r=>!top.includes(r)).map(r=>pick(r,'boost'))];
-  S.pen=S.pen||{};S.pen[wr]=spins.map(s=>({id:s.id,card:s.cards[s.idx],tier:s.tier}));
+    const eff=isLuckTier(tier)?parseEff(cards[idx]):null;if(eff&&eff.t==='steal')eff.from=leader.id;
+    const o={id:r.id,name:r.name,tier,cards,idx,j:+(Math.random()*2-1).toFixed(3)};if(eff)o.eff=eff;return o;};
+  // Handicaps für die Top 3, dann Glück von Platz 4 abwärts
+  const spins=[...top.map((r,i)=>pick(r,['schwer','mittel','leicht'][i])),...rest.map((r,i)=>pick(r,lt[i]))];
+  S.pen=S.pen||{};S.pen[wr]=spins.map(s=>{const h={id:s.id,card:s.cards[s.idx],tier:s.tier};if(s.eff)h.eff=s.eff;return h;});
   S.fx={type:'wheel',round:wr,spins,t:Date.now()};seenFx=S.fx.t;
   persist();render();unlockAudio();playWheel(S.fx);
 }
