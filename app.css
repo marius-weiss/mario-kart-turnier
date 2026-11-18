@@ -159,6 +159,8 @@ td.total{color:var(--ink);font-weight:900;font-size:21px;letter-spacing:-.01em}
 .bonus.minus{color:var(--bad)}
 .tie{display:inline-block;font-size:12px;font-weight:800;line-height:1;padding:5px 9px;border-radius:999px;margin-left:10px;vertical-align:2px;color:var(--bad);background:var(--bad-bg)}
 .tie.won{color:var(--good);background:var(--good-bg)}
+.tie.soft{color:var(--muted);background:var(--surface-2);font-weight:700}
+.tbbtn.soft{opacity:.75}
 .tbbtn{font:800 12px var(--font);margin-left:6px;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;vertical-align:1px}
 .tbbtn.del{color:var(--bad)}
 /* Ziellinie zwischen Finalplätzen und Spaßfinale */

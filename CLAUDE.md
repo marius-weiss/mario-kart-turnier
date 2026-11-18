@@ -18,6 +18,7 @@ Statische Web-App für ein Mario-Kart-Turnier (Liga mit wechselnden Gruppen, dan
 - Turnierstand in `localStorage` `mk-turnier-v2`, Ruhmeshalle lokal in `mk-ruhm-v1`. Alte gespeicherte Stände und Exporte müssen weiter laden: neue Felder immer mit Standardwert in `DEF()` bzw. `migrate()` ergänzen, nie umbenennen.
 - Das Beamer-Fenster (`#anzeige`) wird über das `storage`-Event synchronisiert.
 - Punkte-Boni (Kopfgeld, Glücksrad) werden immer berechnet und nie in die eingetragenen Rohpunkte gemischt.
+- Stechen (`standings()`): nur bei gleichen Punkten und gleichem Bestwert, erst nach der letzten Liga-Runde und nur, wenn es über Finale/Halbfinale oder die Halbfinal-Gruppe (A: Plätze 1, 4, 5, 8; B: 2, 3, 6, 7) entscheidet. Bis dahin ist „Finalrunde starten“ gesperrt. Andere Gleichstände sind nur „punktgleich“.
 - Kein `*.json` in `.gitignore`, sonst wird `ruhmeshalle.json` nicht committet.
 
 ## Server (für den Online-Ausbau)
