@@ -24,7 +24,9 @@ const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).t
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,10);
 const nameOf=id=>{const p=S.players.find(p=>p.id===id);return p?p.name:'?'};
-const brandHtml=()=>`${S.logo?`<img src="${S.logo}" alt="Eigenes Bild">`:''}<h1 class="logo">Mario Kart Turnier</h1>`;
+/* Schriftzug je Design; IT-DLZ: vollständiger Turniername nach Corporate Design */
+const BRAND_TEXT={itdlz:'IT-DLZ <span class="cup-b">Mario Kart</span> Cup<span class="cup-flag" aria-hidden="true"></span>'};
+const brandHtml=()=>`${S.logo?`<img src="${S.logo}" alt="Eigenes Bild">`:''}<h1 class="logo">${BRAND_TEXT[document.documentElement.dataset.design]||'Mario Kart Turnier'}</h1>`;
 const badge=(n)=>n>=1&&n<=3?`<span class="medal m${n}"><b>${n}</b></span>`:`<span class="pn">${n}</span>`;
 
 /* ---------- Logik ---------- */
@@ -802,7 +804,7 @@ function renderRuhm(){
 loadRuhm();
 
 /* ---------- Design-Auswahl (eine HTML-Datei je Design, Stand liegt gemeinsam in localStorage) ---------- */
-const DESIGNS=[['standard','Standard','mario-kart-turnier.html'],['bayern','Bayern','mario-kart-turnier-bayern.html'],['sunset','Sunset','mario-kart-turnier-sunset.html']];
+const DESIGNS=[['standard','Standard','mario-kart-turnier.html'],['bayern','Bayern','mario-kart-turnier-bayern.html'],['sunset','Sunset','mario-kart-turnier-sunset.html'],['itdlz','IT-DLZ Cup','mario-kart-turnier-itdlz.html']];
 const DKEY='mk-design',myDesign=document.documentElement.dataset.design;
 const designFile=k=>(DESIGNS.find(d=>d[0]===k)||DESIGNS[0])[2];
 try{localStorage.setItem(DKEY,myDesign);}catch(e){}

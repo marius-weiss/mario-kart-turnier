@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de" data-design="itdlz">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IT-DLZ Mario Kart Cup</title>
+<script>try{var t=localStorage.getItem('mk-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="theme-itdlz.css">
+</head>
+<body>
+<div class="curb" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top edit-only">
+    <div class="brand" id="brandEdit"><h1 class="logo">Mario Kart Turnier</h1></div>
+    <p class="sub" id="sub"></p>
+    <nav aria-label="Bereiche">
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="teilnehmer">Teilnehmer</button>
+        <button role="tab" data-tab="liga">Liga</button>
+        <button role="tab" data-tab="tabelle">Tabelle</button>
+        <button role="tab" data-tab="finale">Turnierbaum</button>
+        <button role="tab" data-tab="ruhm">Ruhmeshalle</button>
+      </div>
+      <span class="spacer"></span>
+      <div class="seg themesel" id="themeSel" role="radiogroup" aria-label="Hell oder dunkel"></div>
+      <label class="design" title="Design wechseln">🎨 <select id="designSel" aria-label="Design"></select></label>
+      <button class="show" id="openDisplay">Anzeige für Bildschirm öffnen</button>
+    </nav>
+  </header>
+  <main>
+    <section id="teilnehmer" class="edit-only"></section>
+    <section id="liga" class="edit-only"></section>
+    <section id="tabelle" class="edit-only"></section>
+    <section id="finale" class="edit-only"></section>
+    <section id="ruhm" class="edit-only"></section>
+    <section id="anzeige"></section>
+  </main>
+</div>
+<div id="fx" role="status" aria-live="assertive"><div class="fxbox"><div class="biglights"><i></i><i></i><i></i></div><div class="fxtext" id="fxText"></div><div class="fxsub" id="fxSub"></div></div></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div id="wheelfx" role="status" aria-live="polite"></div>
+<div class="flags" id="flags" aria-hidden="true"><div class="flag"></div><div class="flag"></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>

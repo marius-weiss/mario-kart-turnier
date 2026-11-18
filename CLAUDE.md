@@ -4,8 +4,9 @@ Statische Web-App für ein Mario-Kart-Turnier (Liga mit wechselnden Gruppen, dan
 
 ## Struktur
 - `app.js`: die komplette Logik für alle Designs (eine Datei, kein Build-Schritt, keine Abhängigkeiten).
-- `app.css`: Basis-Design. `theme-bayern.css` und `theme-sunset.css` enthalten nur die Abweichungen und werden danach geladen.
-- `mario-kart-turnier.html`, `-bayern.html`, `-sunset.html`: nur Markup. Sie unterscheiden sich ausschließlich in `data-design`, `<title>` und dem Theme-Stylesheet.
+- `app.css`: Basis-Design. `theme-bayern.css`, `theme-sunset.css` und `theme-itdlz.css` enthalten nur die Abweichungen und werden danach geladen.
+- `theme-itdlz.css` setzt das Corporate Design „IT-DLZ Mario Kart Cup“ um. Verbindlich sind dort nur die Farben (#008FCF, #FF7030, #111820, #F4F1E9, #FFFFFF); die Schrift bleibt Nunito. Konfetti, Pokal und Emojis bleiben auf Wunsch des Nutzers, obwohl das CD (fürs Plakat) sie meidet. Der Schriftzug je Design steht in `BRAND_TEXT` in `app.js`.
+- `mario-kart-turnier.html`, `-bayern.html`, `-sunset.html`, `-itdlz.html`: nur Markup. Sie unterscheiden sich ausschließlich in `data-design`, `<title>` und dem Theme-Stylesheet.
 - Farben von Siegerlinie und Konfetti kommen aus den CSS-Variablen `--wire-stops` und `--confetti`.
 - `index.html`: leitet auf das zuletzt gewählte Design weiter (`localStorage` `mk-design`).
 - `ruhmeshalle.json`: Online-Stand der Ruhmeshalle, wird per Download aus der App ersetzt und committet.
