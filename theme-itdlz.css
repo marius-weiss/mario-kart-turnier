@@ -1,0 +1,51 @@
+/* Design: IT-DLZ Mario Kart Cup (wird nach app.css geladen)
+   Farben nach Corporate Design: IT-DLZ Blue #008FCF, Racing Orange #FF7030, Asphalt Black #111820,
+   Warm White #F4F1E9, Pure White #FFFFFF. Schrift bleibt Nunito. */
+:root{
+  --cup-blue:#008FCF; --cup-orange:#FF7030; --cup-asphalt:#111820; --cup-warm:#F4F1E9; --cup-white:#FFFFFF;
+  --bg:var(--cup-warm); --surface:var(--cup-white); --surface-2:#F9F7F2; --line:#E3DED2;
+  --ink:var(--cup-asphalt); --muted:#555B63; --faint:#80858C; --edge:var(--cup-asphalt);
+  --accent:var(--cup-orange); --on-accent:var(--cup-asphalt);
+  /* Blau statt Grün für Finalplätze und Boni, dunkleres Blau für Text auf Weiß (Kontrast) */
+  --good:#006E9F; --good-bg:#E1F1F9; --bad:#B4430F; --bad-bg:#FCE9DF;
+  --curb:var(--cup-asphalt); --k1:var(--cup-blue); --k2:var(--cup-orange);
+  /* Glücksrad-Felder in Markenfarben, hell genug für dunkle Symbole */
+  --red:var(--cup-orange); --yellow:var(--cup-white); --green:#9CD4EE; --blue:var(--cup-blue);
+  --road:var(--cup-asphalt); --wire-line:var(--cup-white);
+  --wire-stops:0 #FF7030, .45 #FF7030, .46 #FFFFFF, .58 #FFFFFF, .59 #008FCF, 1 #008FCF;
+  --confetti:#008FCF #FF7030 #FFFFFF #111820 #008FCF #FF7030;
+  --cup-bars:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14'%3E%3Cpath d='M10 0h16L18 14H2z' fill='%23008FCF'/%3E%3Cpath d='M34 0h16l-8 14H26z' fill='%23008FCF'/%3E%3Cpath d='M58 0h60l-8 14H50z' fill='%23FF7030'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:var(--cup-asphalt); --surface:#19212B; --surface-2:#212A35; --line:#2D3844;
+  --ink:var(--cup-warm); --muted:#A8AEB5; --faint:#7A818A; --edge:#05080B;
+  --good:#4DB8EA; --good-bg:rgba(0,143,207,.16); --bad:#FF8A55; --bad-bg:rgba(255,112,48,.14);
+  --curb:var(--cup-warm); --k1:#2BA8E2; --k2:var(--cup-orange); --road:#0A0F14; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:var(--cup-asphalt); --surface:#19212B; --surface-2:#212A35; --line:#2D3844;
+  --ink:var(--cup-warm); --muted:#A8AEB5; --faint:#7A818A; --edge:#05080B;
+  --good:#4DB8EA; --good-bg:rgba(0,143,207,.16); --bad:#FF8A55; --bad-bg:rgba(255,112,48,.14);
+  --curb:var(--cup-warm); --k1:#2BA8E2; --k2:var(--cup-orange); --road:#0A0F14; color-scheme:dark;}
+
+/* Kopfleiste: Asphalt-Linie mit den drei schrägen Markierungsbalken (zweimal Blau, einmal Orange) */
+.curb{height:14px;background:var(--cup-bars) right 16px center/120px 14px no-repeat,
+  linear-gradient(var(--curb),var(--curb)) left 16px center/calc(100% - 160px) 3px no-repeat,var(--bg)}
+
+/* Schriftzug ohne Kontur und Schatten: IT-DLZ schwarz, MARIO KART blau, CUP schwarz, dahinter Zielflagge */
+.logo{color:var(--ink);-webkit-text-stroke:0;text-shadow:none;text-transform:uppercase;letter-spacing:-.02em;line-height:.95}
+.logo .cup-b{color:var(--cup-blue)}
+.logo .cup-flag{display:inline-block;width:1.15em;height:.5em;margin-left:.18em;vertical-align:.12em;transform:skewX(-18deg);
+  background:conic-gradient(var(--ink) 25%,transparent 0 50%,var(--ink) 0 75%,transparent 0) 0 0/.38em .25em}
+:root[data-theme="dark"] .logo .cup-b{color:#2BA8E2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo .cup-b{color:#2BA8E2}}
+
+/* Überschriften im Cup-Stil: fett, kursiv, Versalien */
+h2,.dtitle{font-style:italic;text-transform:uppercase;letter-spacing:-.01em}
+
+/* Beamer-Knopf in Asphalt statt Signalfarbe (weißer Text auf Blau wäre zu kontrastarm) */
+nav .show{background:var(--cup-asphalt);color:var(--cup-white);box-shadow:0 3px 0 #000}
+:root[data-theme="dark"] nav .show{background:var(--cup-blue);color:var(--cup-asphalt);box-shadow:0 3px 0 #005A82}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) nav .show{background:var(--cup-blue);color:var(--cup-asphalt);box-shadow:0 3px 0 #005A82}}
+
+/* Beamer: langer Turniername etwas kleiner, damit Zähler und Knöpfe in derselben Zeile bleiben */
+.dhead .logo{font-size:clamp(28px,3.2vw,60px)}
