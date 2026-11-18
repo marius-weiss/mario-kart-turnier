@@ -113,12 +113,25 @@ function standings(){
   rows.forEach(r=>r.tbr=tbRank(r));
   rows.sort((a,b)=>b.total-a.total||b.best-a.best||(a.tbr===b.tbr?0:a.tbr<b.tbr?-1:1)||a.name.localeCompare(b.name,'de'));
   const same=(a,b)=>!!(a&&b&&a.total===b.total&&a.best===b.best);
-  rows.forEach((r,i)=>{const o=rows[i-1],n=rows[i+1];
-    r.tieAny=r.total>0&&(same(o,r)||same(n,r));
-    r.tie=r.tieAny&&r.tbr===Infinity&&rows.some(x=>x!==r&&same(x,r)&&x.tbr===Infinity);
-    r.tieWon=r.tieAny&&r.tbr!==Infinity;});
+  /* Gleichstand (Punkte und Bestwert gleich) bewerten:
+     entscheidend = die noch offenen Plätze liegen auf verschiedenen Seiten der Finallinie
+     oder (bei Halbfinals) in verschiedenen Halbfinals. Nur dann gibt es nach der Liga ein Stechen.
+     tie = Stechen nötig (nach der Liga), tieSoft = nur punktgleich, tieWon = Stechen schon entschieden */
+  const plan=planFor(rows.length),done=ligaDone();
+  const side=p=>plan.type==='direct'?0:p<plan.qual?1:2;
+  const half=p=>plan.type!=='semis'||p>7?'':[0,3,4,7].includes(p)?'A':'B';
+  rows.forEach(r=>{r.tie=r.tieSoft=r.tieWon=r.tieDecisive=r.tieAny=false;});
+  for(let i=0;i<rows.length;){let j=i;while(j+1<rows.length&&same(rows[i],rows[j+1]))j++;
+    if(j>i&&rows[i].total>0){const open=[];
+      for(let p=i;p<=j;p++){rows[p].tieAny=true;if(rows[p].tbr===Infinity)open.push(p);else rows[p].tieWon=true;}
+      if(open.length>=2){const dec=new Set(open.map(p=>side(p)+half(p))).size>1;
+        open.forEach(p=>{const r=rows[p];r.tieDecisive=dec;if(dec&&done)r.tie=true;else r.tieSoft=true;});}}
+    i=j+1;}
   return rows;
 }
+/* Offene Stechen, die über Finale/Halbfinale entscheiden (nach der Liga): [[Zeile, …], …] */
+function pendingStechen(st){st=st||standings();const m=new Map();st.forEach((r,i)=>{if(r.tie){const k=tieSig(r);if(!m.has(k))m.set(k,[]);m.get(k).push({r,pos:i+1});}});return[...m.values()];}
+const stechenText=l=>l.map(g=>`${g.map(x=>x.r.name).join(' gegen ')} (Platz ${g[0].pos}${g.length>1?'–'+g[g.length-1].pos:''})`).join(', ');
 function planFor(n){
   if(n<=4)return{type:'direct',qual:n,text:'Alle fahren direkt das Finale.'};
   if(n<=10)return{type:'top4',qual:4,text:'Die Top 4 der Tabelle fahren das Finale, alle anderen das Spaßfinale.'};
@@ -137,6 +150,7 @@ function finalHeat(){
 }
 function startFinals(){
   const st=standings(),plan=planFor(st.length),ids=st.map(r=>r.id);
+  if(pendingStechen(st).length)return;
   const F={type:plan.type,semis:[],finalBase:null,finalPlace:{},fun:[]};let rest;
   if(plan.type==='semis'){const t=ids.slice(0,8);
     F.semis=[{name:'Halbfinale A',members:[t[0],t[3],t[4],t[7]].filter(Boolean),place:{}},{name:'Halbfinale B',members:[t[1],t[2],t[5],t[6]].filter(Boolean),place:{}}];
@@ -151,7 +165,9 @@ function tableHtml(editable){
   const st=standings(),plan=planFor(st.length);
   if(!st.length)return`<p class="muted">Noch keine Teilnehmer.</p>`;
   const nR=Math.max(S.rounds,S.roundsData.length);
+  const done=ligaDone();
   const tieCell=r=>r.tie?`<span class="tie">Stechen</span>${editable?`<button class="tbbtn" data-tbwin="${r.id}" aria-label="${esc(r.name)} hat das Stechen gewonnen">hat gewonnen</button>`:''}`
+    :r.tieSoft?`<span class="tie soft" title="Gleiche Punkte und gleiches Bestergebnis${r.tieDecisive?'. Nach der letzten Liga-Runde wird ein Stechen gefahren.':', entscheidet aber nicht über Finale oder Halbfinale.'}">punktgleich</span>${editable&&done?`<button class="tbbtn soft" data-tbwin="${r.id}" aria-label="${esc(r.name)} vorne einordnen" title="Optional, nur für die Reihenfolge, z. B. in der Ruhmeshalle">vorne einordnen</button>`:''}`
     :r.tieWon?`<span class="tie won">Stechen ✓</span>${editable?`<button class="tbbtn" data-tbreset="${esc(tieSig(r))}" aria-label="Stechen bei ${esc(r.name)} zurücksetzen" title="Stechen zurücksetzen">↺</button>`:''}`:'';
   const cell=(r,k)=>(r.per[k]==null?'–':r.per[k])+bonusChips(r.bb[k],r.lb[k]);
   // Ziellinie unter dem letzten Platz, der ins Finale bzw. Halbfinale kommt
@@ -411,7 +427,7 @@ function draw(){
 function renderTabelle(){
   const plan=planFor(S.players.length);
   $('tabelle').innerHTML=`<h2>Tabelle</h2><div class="panel">${tableHtml(true)}
-  <p class="note">${plan.type!=='direct'?`Die Ziellinie trennt die Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}Hinter den Rundenpunkten: 💰 Kopfgeld, 🍀 Glücksrad, 🦝 Punkteklau, alles zählt in die Gesamtpunkte. Bei Punktgleichheit zählt das beste Einzelergebnis, danach ein Stechen-Rennen. Den Sieger des Stechens per „hat gewonnen“ festlegen.</p></div>`;
+  <p class="note">${plan.type!=='direct'?`Die Ziellinie trennt die Plätze, die ins ${plan.type==='semis'?'Halbfinale':'Finale'} kommen. `:''}Hinter den Rundenpunkten: 💰 Kopfgeld, 🍀 Glücksrad, 🦝 Punkteklau, alles zählt in die Gesamtpunkte. Bei Punktgleichheit zählt das beste Einzelergebnis. Ist auch das gleich und geht es um den Einzug ins ${plan.type==='semis'?'Halbfinale oder die Halbfinal-Gruppe':'Finale'}, wird nach der letzten Liga-Runde ein Stechen gefahren: Sieger per „hat gewonnen“ festlegen. Andere Gleichstände sind nur „punktgleich“ und können optional eingeordnet werden.</p></div>`;
   $('tabelle').querySelectorAll('[data-tbwin]').forEach(b=>b.onclick=()=>{
     const r=standings().find(x=>x.id===b.dataset.tbwin);if(!r)return;
     const k=tieSig(r);S.tb=S.tb&&typeof S.tb==='object'?S.tb:{};
@@ -423,7 +439,7 @@ function renderFinale(){
   $('finale').innerHTML=`<h2>Turnierbaum</h2><div class="panel">${treeHtml(true)}
   <p class="note">${F?(F.fun.length?'Reihenfolge: zuerst das Spaßfinale, dann schauen alle gemeinsam das Finale. ':'')+'Trag die Plätze ein, die das Spiel nach dem Rennen anzeigt.':esc(planFor(n).text)}</p>
   <div class="row" style="margin-top:14px">${F?`<button class="btn ghost" id="unfinBtn">Finalrunde zurücksetzen</button>`
-    :`<button class="btn go" id="finBtn" ${ligaDone()&&n>=2?'':'disabled'}>Finalrunde starten</button>${ligaDone()?'':`<span class="muted">Geht los, sobald alle ${S.rounds} Liga-Runden eingetragen sind.</span>`}`}</div></div>
+    :(()=>{const ps=ligaDone()?pendingStechen():[];return`<button class="btn go" id="finBtn" ${ligaDone()&&n>=2&&!ps.length?'':'disabled'}>Finalrunde starten</button>${!ligaDone()?`<span class="muted">Geht los, sobald alle ${S.rounds} Liga-Runden eingetragen sind.</span>`:ps.length?`<span class="muted">Erst das Stechen austragen: ${esc(stechenText(ps))}. Sieger in der Tabelle festlegen.</span>`:''}`;})()}</div></div>
   ${podiumHtml()}${archiveHtml()}`;
   $('finale').querySelectorAll('select[data-heat]').forEach(sel=>{
     const k=sel.dataset.heat,h=k==='f'?finalHeat():F.semis[+k.slice(1)];
