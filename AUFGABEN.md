@@ -2,7 +2,7 @@
 
 Erledigte Aufgaben abhaken (`[x]`) und kurz notieren, was umgesetzt wurde. Die Regeln aus `CLAUDE.md` gelten für alles hier.
 
-Die beiden offenen Aufgaben erst **nach dem Turnier**, in dieser Reihenfolge.
+Die beiden offenen Aufgaben erst **nach dem Turnier**, in dieser Reihenfolge. Danach kommt der **Online-Ausbau** (unten) in drei Etappen.
 
 ## [x] Design-Schritte von `testdaten` nach `main` bringen
 
@@ -61,3 +61,78 @@ Bevor das Turnier offiziell beginnt, sollen alle im Raum auf dem Beamer sehen: w
 - Einen alten Spielstand (ohne die neuen Felder) laden.
 - Alle drei Designs, hell/dunkel, Handybreite.
 - Im Branch `testdaten` das Szenario „Leeres Turnier“ bzw. eines vor Runde 1 nutzen. Dort ggf. ein Szenario „Warm-up, Start in 30 Minuten“ ergänzen (nur auf `testdaten`, nie nach `main` mergen).
+
+---
+
+# Online-Ausbau: öffentliche Live-Ansicht, Admin-Bereich, später mehrere Standorte
+
+Erst nach den beiden Aufgaben oben angehen, die Etappen in Reihenfolge. Jede Etappe ist für sich nutzbar. Die Regeln dazu stehen in `CLAUDE.md` (Abschnitt „Server“).
+
+**Ziel:** Jeder im Raum kann den laufenden Turnierstand per Link oder QR-Code am Handy mitverfolgen. Der Turnierleiter arbeitet in einem geschützten Admin-Bereich. Später können andere Standorte eigene Turniere und eine eigene Ruhmeshalle führen.
+
+**Technik:** Cloudflare Worker (läuft schon für die statischen Dateien) plus D1 (SQL) für die Daten. Admin-Schutz über Cloudflare Access. Live-Aktualisierung zunächst per Nachfragen alle 5–10 Sekunden, keine WebSockets.
+
+### Was der Nutzer selbst im Cloudflare-Dashboard einrichten muss
+Vorher mit dem Nutzer durchgehen, nicht raten:
+- D1-Datenbanken anlegen, je eine für Produktion und eine für Previews, damit `testdaten` nie echte Daten schreibt. Mit `wrangler d1 create …` oder im Dashboard; die IDs kommen in `wrangler.jsonc`.
+- Zero Trust → Access → Application für den Admin-Pfad, mit den erlaubten E-Mail-Adressen.
+- Prüfen, ob die D1-Bindung auch in Branch-Previews ankommt. Der `previews`-Block übernimmt laut Berichten nicht alle Einstellungen der obersten Ebene; ggf. Bindungen dort extra eintragen.
+
+## [ ] Etappe 1: Live-Ansicht für alle, Admin-Bereich geschützt
+
+Die Spiellogik bleibt im Browser des Admins. Der Server speichert nur den Turnierstand (`S`, wie in `localStorage` `mk-turnier-v2`) und gibt ihn öffentlich lesbar aus. Das ist der kleinste Umbau mit dem größten Effekt.
+
+**Server (Worker):**
+- `src/worker.js` beantwortet `/api/*`, alles andere liefern weiter die statischen Dateien. In `wrangler.jsonc`: `main`, Assets-Binding und `run_worker_first` nur für `/api/*`. Die genaue Syntax in der aktuellen Wrangler-Doku prüfen.
+- D1-Tabelle `turniere`: `id` (zufällig, nicht erratbar), `name`, `state` (JSON), `version` (Zahl, für Konflikte), `oeffentlich` (an/aus), `aktualisiert`. Schema als Migration unter `migrations/`.
+- `GET /api/turnier/:id`: öffentlich, nur wenn `oeffentlich` an ist. Gibt nur aus, was die öffentliche Ansicht braucht: kein Logo-Upload, keine Admin-Einstellungen, keine Ruhmeshallen-Entwürfe.
+- `PUT /api/turnier/:id` mit `version`: nur Admin. Ist die gespeicherte Version neuer, antwortet der Server mit einem Konflikt statt zu überschreiben.
+- Admin-Prüfung: Cloudflare Access schützt den Admin-Pfad. Der Worker prüft zusätzlich das Access-JWT (Header `Cf-Access-Jwt-Assertion`) gegen die Zertifikate des Teams. Ein vorhandener Header allein reicht nicht.
+- `src/`, `migrations/` und `package.json` (falls nötig) in `.assetsignore` eintragen.
+
+**Admin-Seite:**
+- Die bisherige Bearbeiten-Ansicht, erreichbar unter dem geschützten Pfad.
+- Neues Turnier „online stellen“ → bekommt eine `id`. Danach wird nach jedem `persist()` gebündelt gespeichert, höchstens etwa alle 2 Sekunden.
+- Sichtbarer Status in der Kopfzeile: „Online gespeichert“, „Offline, wird nachgereicht“ oder „Konflikt“.
+- **Offline-fähig:** `localStorage` bleibt die Hauptquelle am Turniertag. Fällt das Netz aus, läuft alles weiter und wird später nachgeschickt.
+- Schalter „Öffentliche Ansicht an/aus“.
+- Link und QR-Code zur öffentlichen Ansicht. QR-Code ohne externe Dienste: entweder eine kleine eigene Implementierung oder eine Bibliothek, die als lokale Datei im Repo liegt.
+
+**Öffentliche Ansicht:**
+- Eigene Seite, z. B. `live.html?t=<id>`, nur lesend, ohne Eingabefelder und ohne Admin-Knöpfe.
+- Nutzt dieselben Bausteine wie die Beamer-Anzeige: Gruppen, Tabelle mit 💰/🍀/🦝, Turnierbaum, Glücksrad-Ergebnisse, Siegerehrung. Fürs Handy als Tabs statt Rotation, mit eigenem Vollbild-Modus für den Beamer.
+- Fragt alle 5–10 Sekunden nach und aktualisiert nur, wenn sich `version` geändert hat. Ohne Netz bleibt der letzte Stand sichtbar, mit dem Hinweis „Stand von 17:42“.
+- Sinnvolle Meldungen für unbekannte `id` und für ausgeschaltete öffentliche Ansicht.
+
+**Weiter wie bisher:**
+- Ohne Server, also lokal als Datei oder ohne Netz, funktioniert die App wie heute. Nur die Online-Funktionen sind dann aus.
+- Das Beamer-Fenster im selben Browser wird weiter über das `storage`-Event synchronisiert.
+- Alte Spielstände und Export/Import laden weiter.
+
+**Testen:**
+- Mit `wrangler dev` und lokaler D1 (`wrangler d1 migrations apply … --local`).
+- Admin und öffentliche Ansicht in zwei Browsern: Punkte eintragen, die öffentliche Ansicht folgt in wenigen Sekunden.
+- Netz trennen und wiederherstellen; Konflikt mit zwei Admin-Fenstern.
+- Ohne Login darf `PUT` nicht durchgehen.
+- Handybreite, alle Designs, hell und dunkel. Dann die Preview auf `testdaten` mit der Preview-Datenbank.
+
+## [ ] Etappe 2: Ruhmeshalle in die Datenbank
+
+- D1-Tabelle für Ruhmeshallen-Einträge, gleiche Felder wie in `ruhmeshalle.json`: `id`, `datum`, `titel`, `teilnehmer`, `platzierung`.
+- Den Inhalt der heutigen `ruhmeshalle.json` einmalig importieren.
+- `GET` ist öffentlich. Eintragen, Korrigieren und Löschen nur als Admin.
+- Ablauf danach: „Eintragen“ nach der Siegerehrung speichert direkt online. Download und Git-Commit entfallen.
+- Der Button „ruhmeshalle.json herunterladen“ bleibt als Export und Backup.
+- Ohne Server fällt die App auf die statische `ruhmeshalle.json` zurück, wie heute.
+- Die bisherige Sicherung gegen Datenverlust beibehalten: nichts überschreiben, was nicht vorher erfolgreich geladen wurde.
+- Ewige Tabelle und Beamer-Ansicht bleiben gleich.
+
+## [ ] Etappe 3: Mehrere Standorte und Turniere
+
+**Erst angehen, wenn ein anderer Standort es wirklich nutzen will.** Vorher mit dem Nutzer klären, wie Standorte und Admins verwaltet werden sollen.
+
+- Tabelle `standorte`. Turniere und Ruhmeshallen-Einträge gehören zu einem Standort.
+- Admins je Standort: entweder per Access-Gruppe oder per E-Mail-Liste in D1, die der Worker gegen die E-Mail aus dem Access-JWT prüft.
+- Öffentliche Startseite je Standort: laufende und vergangene Turniere, Ruhmeshalle des Standorts.
+- Glücksrad-Karten und Einstellungen je Standort als Vorlage für neue Turniere.
+- Datenschutz: In der öffentlichen Ansicht stehen Namen. Pro Standort einstellbar machen, ob öffentlich angezeigt wird. Hinweis an den Nutzer, das mit dem Standort abzuklären.
